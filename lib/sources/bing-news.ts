@@ -1,12 +1,25 @@
 /**
  * Bing News v7 source — only active if BING_NEWS_API_KEY is set.
  * Azure free tier is 1,000 calls/month.
+ *
+ * 72h filter at source: uses the `freshness` parameter.
+ *   - 24h window → freshness=Day
+ *   - 25–168h    → freshness=Week (Bing's narrowest "recent" option)
+ *   - >168h      → freshness=Month
+ * We then trim further downstream via the freshness module.
  */
 
 import type { Article } from '@/lib/types';
+import { getLookbackHours } from '@/lib/freshness';
 
 export function bingNewsAvailable(): boolean {
   return Boolean(process.env.BING_NEWS_API_KEY);
+}
+
+function freshnessParam(hours: number): 'Day' | 'Week' | 'Month' {
+  if (hours <= 24) return 'Day';
+  if (hours <= 168) return 'Week';
+  return 'Month';
 }
 
 export async function searchBingNews(
@@ -16,8 +29,10 @@ export async function searchBingNews(
   const key = process.env.BING_NEWS_API_KEY;
   if (!key) return [];
 
+  const lookbackHours = getLookbackHours();
+  const freshness = freshnessParam(lookbackHours);
   const q = [company, ...extraTerms].join(' ');
-  const url = `https://api.bing.microsoft.com/v7.0/news/search?q=${encodeURIComponent(q)}&count=50&freshness=Week&sortBy=Date&mkt=en-US`;
+  const url = `https://api.bing.microsoft.com/v7.0/news/search?q=${encodeURIComponent(q)}&count=50&freshness=${freshness}&sortBy=Date&mkt=en-US`;
 
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 9000);
