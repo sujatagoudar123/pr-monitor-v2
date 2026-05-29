@@ -1,17 +1,18 @@
 /**
  * POST /api/agent-search
  *
- * Body: { company: "GSK" }
+ * Body: {
+ *   company: "GSK",
+ *   lookbackHours?: number   // optional override of the FRESHNESS_HOURS env var
+ * }
  *
- * Pipeline (in this order):
- *   1. Agent loop gathers from all required sources (each filtered to 72h at source)
+ * Pipeline:
+ *   1. Agent loop gathers from required sources (each filtered at source)
  *   2. Dedupe by URL + title
- *   3. Apply 72h freshness filter (defensive — sources already filter, but dates can lie)
- *   4. Claude ranks each surviving article 0.0–1.0 (batches of 25)
- *   5. Drop ranked articles below MIN_RELEVANCE (0.4)
- *   6. Claude writes 2–3 sentence executive summary
- *
- * Freshness moved BEFORE ranking so we don't waste tokens scoring stale articles.
+ *   3. Apply freshness filter (defensive)
+ *   4. Rank ranked articles 0.0-1.0
+ *   5. Drop below MIN_RELEVANCE
+ *   6. Write executive summary
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
   }
 
-  let body: { company?: string };
+  let body: { company?: string; lookbackHours?: number };
   try {
     body = await req.json();
   } catch {
@@ -53,10 +54,19 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic({ apiKey });
   const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
-  const lookbackHours = getLookbackHours();
+  // Use override from body if provided (cron passes per-slot lookback), else env var
+  const lookbackHours =
+    typeof body.lookbackHours === 'number' && body.lookbackHours > 0
+      ? body.lookbackHours
+      : getLookbackHours();
+
+  // Set FRESHNESS_HOURS for this request's lifetime so source connectors
+  // (rss/google-news/newsapi/bing) all pick up the per-slot value.
+  const previousEnv = process.env.FRESHNESS_HOURS;
+  process.env.FRESHNESS_HOURS = String(lookbackHours);
 
   try {
-    // 1) Agent gathers from all required sources
+    // 1) Agent gathers
     const { articles: gathered, sourcesUsed, trace } = await runAgentLoop(client, model, company);
     const totalGathered = gathered.length;
 
@@ -64,25 +74,21 @@ export async function POST(req: NextRequest) {
     const deduped = dedupeArticles(gathered);
     const afterDedupe = deduped.length;
 
-    // 3) Freshness filter (BEFORE ranking — saves LLM tokens on stale articles)
+    // 3) Freshness (defensive — sources already filter)
     const freshness = applyFreshness(deduped, lookbackHours);
     const fresh = freshness.kept;
 
-    // 4) Rank only the fresh articles
+    // 4) Rank
     const ranked = await rankArticles(client, model, company.name, company.keywords, fresh);
-    const afterRanking = ranked.length;
 
-    // 5) Final list — already sorted by relevance descending by rankArticles
-    const articles = ranked;
-
-    // 6) Executive summary
-    const executiveSummary = await writeExecutiveSummary(client, model, company.name, articles);
+    // 5) Summary
+    const executiveSummary = await writeExecutiveSummary(client, model, company.name, ranked);
 
     return NextResponse.json({
       company: company.name,
       keywordsUsed: company.keywords,
       executiveSummary,
-      articles,
+      articles: ranked,
       stats: {
         totalGathered,
         afterDedupe,
@@ -90,7 +96,7 @@ export async function POST(req: NextRequest) {
         afterFreshness: fresh.length,
         droppedAsStale: freshness.stats.dropped,
         undated: freshness.stats.undated,
-        afterRanking,
+        afterRanking: ranked.length,
         sourcesUsed,
       },
       trace,
@@ -100,5 +106,9 @@ export async function POST(req: NextRequest) {
       { error: err instanceof Error ? err.message : 'Agent failed' },
       { status: 500 },
     );
+  } finally {
+    // Restore env so concurrent requests don't see our override
+    if (previousEnv === undefined) delete process.env.FRESHNESS_HOURS;
+    else process.env.FRESHNESS_HOURS = previousEnv;
   }
 }
