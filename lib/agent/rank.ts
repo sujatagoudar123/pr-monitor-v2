@@ -12,7 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Article } from '@/lib/types';
 
 const BATCH_SIZE = 25;
-const MIN_RELEVANCE = 0.5;
+const MIN_RELEVANCE = 0.4;
 
 function regexFallback(article: Article, keywords: string[]): {
   relevance: number; matched: string[]; why: string;
