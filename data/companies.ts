@@ -36,24 +36,37 @@ export const COMPANIES: Company[] = [
     // Per GSK_Updated_Scope_and_Terms.xlsx → Sheet "GSK" → "Keywords" column
     // PLUS the products + people from the Detailed Search Terms sheet.
     keywords: [
-      // Company
-      'GSK', 'GlaxoSmithKline', 'Emma Walmsley',
-      // Categories
-      'pharmaceutical', 'biotech', 'Pharma', 'Vaccine', 'Drug price',
-      // Shingles franchise
-      'Shingles', 'SHINGRIX', 'herpes zoster', 'Thrive@50+', 'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family'
-      // Meningitis franchise
-      'Meningitis', 'Meningococcal', 'Bexsero', 'Menveo', 'Ask2BSure', 'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family', 'MenABCWY', 'MenACWY',
-      // RSV
-      'RSV', 'respiratory syncytial virus', 'Arexvy', 'Clesrovimab', 'Nirsevimab', 'Beyfortus'
-      // Flu
-      'Influenza', 'Flu', 'Fluarix', 'Flulaval', 'FluMist', 'Clesrovimab', 'Nirsevimab', 'Beyfortus', 'Ask2BSure', 'Penbraya'
-      // Other diseases
-      'Abrysvo',
-      // Key spokespeople / influencers from Detailed Search Terms
-      'Len Friedland', 'Jenn Sherman', 'Arti Thangudu',
-      'Lisa Breckenridge', 'Daisy Kent', 'Greg Olsen',
-    ],
+  // Company
+  'GSK', 'GlaxoSmithKline', 'Emma Walmsley',
+
+  // Categories
+  'pharmaceutical', 'biotech', 'Pharma', 'Vaccine', 'Drug price',
+
+  // Shingles franchise
+  'Shingles', 'SHINGRIX', 'herpes zoster', 'Thrive@50+',
+  'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family',
+
+  // Meningitis franchise
+  'Meningitis', 'Meningococcal', 'Bexsero', 'Menveo', 'Ask2BSure',
+  'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family',
+  'MenABCWY', 'MenACWY',
+
+  // RSV
+  'RSV', 'respiratory syncytial virus', 'Arexvy',
+  'Clesrovimab', 'Nirsevimab', 'Beyfortus',
+
+  // Flu
+  'Influenza', 'Flu', 'Fluarix', 'Flulaval', 'FluMist',
+  'Clesrovimab', 'Nirsevimab', 'Beyfortus',
+  'Ask2BSure', 'Penbraya',
+
+  // Other diseases
+  'Abrysvo',
+
+  // Key spokespeople / influencers
+  'Len Friedland', 'Jenn Sherman', 'Arti Thangudu',
+  'Lisa Breckenridge', 'Daisy Kent', 'Greg Olsen',
+],
     rssFeeds: [
       { url: 'https://www.gsk.com/en-gb/media/press-releases/rss/', source: 'GSK Press' },
       { url: 'https://feeds.bbci.co.uk/news/rss.xml', source: 'BBC' },
