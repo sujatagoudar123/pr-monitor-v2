@@ -72,14 +72,27 @@ function buildHtml(opts: {
           ? `<span style="font-size:11px;color:#0F7B5F;background:#E7F4EE;padding:2px 6px;border-radius:3px;margin-left:6px;">${Math.round(a.ageHours)}h ago</span>`
           : '';
       const sourceBadge = `<span style="font-size:11px;color:#0A2540;background:#E5DFD3;padding:2px 6px;border-radius:3px;">${escapeHtml(a.source)}</span>`;
+      const fullDate = a.publishedAt
+        ? new Date(a.publishedAt).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit',
+          })
+        : '';
+      const bylineParts: string[] = [];
+      if (a.author) bylineParts.push(`by <span style="color:#1A1A1A;">${escapeHtml(a.author)}</span>`);
+      if (fullDate) bylineParts.push(escapeHtml(fullDate));
+      const byline = bylineParts.length
+        ? `<div style="font-family:Georgia,serif;font-size:12px;color:#6B7280;margin-top:4px;">${bylineParts.join(' · ')}</div>`
+        : '';
       return `
         <tr><td style="padding:16px 0;border-bottom:1px solid #E5DFD3;">
           <div style="margin-bottom:6px;">${sourceBadge}${ageBadge}</div>
           <a href="${escapeHtml(a.link)}" style="font-family:Georgia,serif;font-size:17px;color:#0A2540;font-weight:600;text-decoration:none;">
             ${highlightKeywords(a.title, opts.keywords)}
           </a>
-          ${a.whyPicked ? `<div style="font-family:Georgia,serif;font-size:14px;color:#1A1A1A;margin-top:8px;line-height:1.5;">${escapeHtml(a.whyPicked)}</div>` : ''}
-          ${a.snippet ? `<div style="font-family:Georgia,serif;font-size:13px;color:#6B7280;margin-top:6px;line-height:1.45;">${highlightKeywords(a.snippet.slice(0, 240), opts.keywords)}…</div>` : ''}
+          ${byline}
+          ${a.whyPicked ? `<div style="font-family:Georgia,serif;font-size:14px;color:#1A1A1A;margin-top:8px;line-height:1.5;border-left:2px solid #C9A961;padding-left:10px;font-style:italic;">${escapeHtml(a.whyPicked)}</div>` : ''}
+          ${a.snippet ? `<div style="font-family:Georgia,serif;font-size:13px;color:#6B7280;margin-top:8px;line-height:1.45;">${highlightKeywords(a.snippet.slice(0, 400), opts.keywords)}${a.snippet.length > 400 ? '…' : ''}</div>` : ''}
         </td></tr>
       `;
     }).join('');
