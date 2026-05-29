@@ -10,6 +10,7 @@ interface Article {
   sourceType: string;
   publishedAt?: string | null;
   snippet?: string;
+  author?: string | null;
   matchedKeywords?: string[];
   whyPicked?: string;
   relevanceScore?: number;
@@ -51,6 +52,29 @@ function highlight(text: string, keywords: string[]) {
     out = out.replace(re, '<mark>$1</mark>');
   }
   return out;
+}
+
+function ArticleSnippet({ snippet, keywords }: { snippet: string; keywords: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const SHORT = 240;
+  const isLong = snippet.length > SHORT;
+  const shown = expanded || !isLong ? snippet : snippet.slice(0, SHORT) + '…';
+  return (
+    <div className="mt-2">
+      <p
+        className="serif text-sm text-muted leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: highlight(shown, keywords) }}
+      />
+      {isLong && (
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          className="text-xs text-accent hover:underline mt-1"
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function Page() {
@@ -329,12 +353,21 @@ export default function Page() {
             )}
 
             <div className="space-y-3">
-              {result.articles.map((a, idx) => (
+              {result.articles.map((a, idx) => {
+                const fullDate = a.publishedAt
+                  ? new Date(a.publishedAt).toLocaleString('en-US', {
+                      month: 'short', day: 'numeric', year: 'numeric',
+                      hour: 'numeric', minute: '2-digit',
+                    })
+                  : null;
+                return (
                 <article key={idx} className="bg-white border border-border rounded-md p-6 hover:shadow-soft transition-shadow">
+                  {/* Top row: source badges + age + relevance */}
                   <div className="flex items-center gap-2 mb-3 flex-wrap">
-                    <span className={`text-xs px-2 py-0.5 rounded ${sourceColor[a.sourceType] ?? 'bg-muted/10 text-muted'}`}>
-                      {a.source} · {a.sourceType}
+                    <span className={`text-xs px-2 py-0.5 rounded font-semibold ${sourceColor[a.sourceType] ?? 'bg-muted/10 text-muted'}`}>
+                      {a.source}
                     </span>
+                    <span className="text-xs text-muted">via {a.sourceType.replace('_', ' ')}</span>
                     {a.undated && (
                       <span className="text-xs px-2 py-0.5 rounded bg-cream text-muted border border-border">undated</span>
                     )}
@@ -349,21 +382,38 @@ export default function Page() {
                       </span>
                     )}
                   </div>
+
+                  {/* Title */}
                   <a href={a.link} target="_blank" rel="noreferrer" className="block">
                     <h3
                       className="serif text-xl text-navy font-semibold leading-snug hover:text-accent transition-colors"
                       dangerouslySetInnerHTML={{ __html: highlight(a.title, a.matchedKeywords ?? result.keywordsUsed) }}
                     />
                   </a>
+
+                  {/* Byline: publication · author · full date */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs text-muted">
+                    <span><span className="font-semibold text-navy">{a.source}</span></span>
+                    {a.author && <span>by <span className="text-ink">{a.author}</span></span>}
+                    {fullDate && <span>· {fullDate}</span>}
+                  </div>
+
+                  {/* Why picked */}
                   {a.whyPicked && (
-                    <p className="serif text-sm text-ink/80 mt-3 leading-relaxed italic">{a.whyPicked}</p>
+                    <p className="serif text-sm text-ink/80 mt-3 leading-relaxed italic border-l-2 border-gold pl-3">
+                      {a.whyPicked}
+                    </p>
                   )}
+
+                  {/* Snippet (expandable) */}
                   {a.snippet && (
-                    <p
-                      className="serif text-sm text-muted mt-2 leading-relaxed"
-                      dangerouslySetInnerHTML={{ __html: highlight(a.snippet.slice(0, 220) + (a.snippet.length > 220 ? '…' : ''), a.matchedKeywords ?? result.keywordsUsed) }}
+                    <ArticleSnippet
+                      snippet={a.snippet}
+                      keywords={a.matchedKeywords ?? result.keywordsUsed}
                     />
                   )}
+
+                  {/* Matched keyword chips */}
                   {a.matchedKeywords && a.matchedKeywords.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
                       {a.matchedKeywords.map((k) => (
@@ -372,7 +422,8 @@ export default function Page() {
                     </div>
                   )}
                 </article>
-              ))}
+                );
+              })}
             </div>
 
             {/* Agent trace */}
