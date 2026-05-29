@@ -3,8 +3,15 @@
  *
  * Body: { company: "GSK" }
  *
- * Runs the agent loop, dedupes, ranks, applies 72h freshness, writes summary.
- * Returns full result + agent trace.
+ * Pipeline (in this order):
+ *   1. Agent loop gathers from all required sources (each filtered to 72h at source)
+ *   2. Dedupe by URL + title
+ *   3. Apply 72h freshness filter (defensive — sources already filter, but dates can lie)
+ *   4. Claude ranks each surviving article 0.0–1.0 (batches of 25)
+ *   5. Drop ranked articles below MIN_RELEVANCE (0.4)
+ *   6. Claude writes 2–3 sentence executive summary
+ *
+ * Freshness moved BEFORE ranking so we don't waste tokens scoring stale articles.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -49,7 +56,7 @@ export async function POST(req: NextRequest) {
   const lookbackHours = getLookbackHours();
 
   try {
-    // 1) Agent gathers
+    // 1) Agent gathers from all required sources
     const { articles: gathered, sourcesUsed, trace } = await runAgentLoop(client, model, company);
     const totalGathered = gathered.length;
 
@@ -57,15 +64,18 @@ export async function POST(req: NextRequest) {
     const deduped = dedupeArticles(gathered);
     const afterDedupe = deduped.length;
 
-    // 3) Rank
-    const ranked = await rankArticles(client, model, company.name, company.keywords, deduped);
+    // 3) Freshness filter (BEFORE ranking — saves LLM tokens on stale articles)
+    const freshness = applyFreshness(deduped, lookbackHours);
+    const fresh = freshness.kept;
+
+    // 4) Rank only the fresh articles
+    const ranked = await rankArticles(client, model, company.name, company.keywords, fresh);
     const afterRanking = ranked.length;
 
-    // 4) Apply freshness — 72h window, undated articles kept and flagged
-    const freshness = applyFreshness(ranked, lookbackHours);
-    const articles = freshness.kept;
+    // 5) Final list — already sorted by relevance descending by rankArticles
+    const articles = ranked;
 
-    // 5) Executive summary
+    // 6) Executive summary
     const executiveSummary = await writeExecutiveSummary(client, model, company.name, articles);
 
     return NextResponse.json({
@@ -76,12 +86,11 @@ export async function POST(req: NextRequest) {
       stats: {
         totalGathered,
         afterDedupe,
-        afterRanking,
         lookbackHours,
-        beforeFreshness: freshness.stats.total,
-        afterFreshness: freshness.stats.kept,
+        afterFreshness: fresh.length,
         droppedAsStale: freshness.stats.dropped,
         undated: freshness.stats.undated,
+        afterRanking,
         sourcesUsed,
       },
       trace,
