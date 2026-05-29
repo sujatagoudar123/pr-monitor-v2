@@ -1,105 +1,104 @@
 /**
- * Freshness filter — keeps only articles published within the configured
- * lookback window. Articles with no parseable publishedAt are KEPT but
- * marked `undated: true` so the UI can show a badge.
+ * RSS source — parses curated feeds for a company.
+ * Each feed has a 9-second timeout; failures fall through silently.
+ *
+ * 72h filtering: applied here at the source. Items older than the cutoff
+ * are dropped at parse time. Undated items (no pubDate) are KEPT.
+ *
+ * Extracts: title, link, snippet (up to 800 chars), publishedAt, author.
  */
 
-export const DEFAULT_LOOKBACK_HOURS = 72;
+import Parser from 'rss-parser';
+import type { Article, Company } from '@/lib/types';
+import { getLookbackHours, parsePublishedAt } from '@/lib/freshness';
 
-export function getLookbackHours(): number {
-  const raw = process.env.FRESHNESS_HOURS;
-  if (!raw) return DEFAULT_LOOKBACK_HOURS;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return DEFAULT_LOOKBACK_HOURS;
-  return n;
-}
+// Tell rss-parser to also pull dc:creator and content:encoded if present
+const parser = new Parser({
+  timeout: 9000,
+  headers: { 'User-Agent': 'pr-monitor-agent/2.1 (+vercel)' },
+  customFields: {
+    item: [
+      ['dc:creator', 'creator'],
+      ['content:encoded', 'contentEncoded'],
+      ['author', 'authorField'],
+    ],
+  },
+});
 
-export function parsePublishedAt(input: unknown): Date | null {
-  if (!input) return null;
-  if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
-  if (typeof input === 'number') {
-    const d = new Date(input);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  if (typeof input === 'string') {
-    const s = input.trim();
-    if (!s) return null;
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return d;
-    const asNum = Number(s);
-    if (Number.isFinite(asNum) && asNum > 1_000_000_000) {
-      const d2 = new Date(asNum < 1e12 ? asNum * 1000 : asNum);
-      if (!isNaN(d2.getTime())) return d2;
-    }
-    return null;
+function pickAuthor(item: any): string | null {
+  const candidates = [item.creator, item.author, item.authorField];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
   }
   return null;
 }
 
-export interface FreshnessTagged<T> {
-  article: T;
-  publishedAt: Date | null;
-  undated: boolean;
-  withinWindow: boolean;
-  ageHours: number | null;
+function pickSnippet(item: any): string {
+  // Prefer the longer content:encoded over contentSnippet when available
+  const raw =
+    (typeof item.contentEncoded === 'string' && item.contentEncoded) ||
+    (typeof item.content === 'string' && item.content) ||
+    (typeof item.contentSnippet === 'string' && item.contentSnippet) ||
+    (typeof item.summary === 'string' && item.summary) ||
+    '';
+  // Strip HTML tags for the snippet (UI shows plain text)
+  const text = String(raw).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.slice(0, 800);
 }
 
-export function tagFreshness<T extends { publishedAt?: unknown }>(
-  article: T,
-  lookbackHours: number = getLookbackHours(),
-  now: Date = new Date(),
-): FreshnessTagged<T> {
-  const parsed = parsePublishedAt(article.publishedAt);
-  if (!parsed) {
-    return {
-      article,
-      publishedAt: null,
-      undated: true,
-      withinWindow: true,
-      ageHours: null,
-    };
-  }
-  const ageHours = (now.getTime() - parsed.getTime()) / 3_600_000;
-  return {
-    article,
-    publishedAt: parsed,
-    undated: false,
-    withinWindow: ageHours >= -1 && ageHours <= lookbackHours,
-    ageHours,
-  };
-}
+async function fetchOne(
+  feedUrl: string,
+  sourceName: string,
+  cutoff: Date,
+): Promise<Article[]> {
+  try {
+    const feed = await parser.parseURL(feedUrl);
+    const items = feed.items ?? [];
+    const out: Article[] = [];
+    for (const item of items.slice(0, 80)) {
+      const title = (item.title ?? '').trim();
+      const link = (item.link ?? item.guid ?? '').trim();
+      if (!title || !link) continue;
 
-export function applyFreshness<T extends { publishedAt?: unknown }>(
-  articles: T[],
-  lookbackHours: number = getLookbackHours(),
-  now: Date = new Date(),
-): {
-  kept: Array<T & { undated: boolean; ageHours: number | null }>;
-  dropped: T[];
-  stats: { total: number; kept: number; dropped: number; undated: number };
-} {
-  const kept: Array<T & { undated: boolean; ageHours: number | null }> = [];
-  const dropped: T[] = [];
-  let undatedCount = 0;
+      const rawDate = item.isoDate ?? item.pubDate ?? null;
+      const parsedDate = parsePublishedAt(rawDate);
 
-  for (const a of articles) {
-    const t = tagFreshness(a, lookbackHours, now);
-    if (t.withinWindow) {
-      if (t.undated) undatedCount += 1;
-      kept.push({ ...a, undated: t.undated, ageHours: t.ageHours });
-    } else {
-      dropped.push(a);
+      // Source-level freshness filter: drop dated items older than cutoff.
+      // Undated items are KEPT and flagged downstream.
+      if (parsedDate && parsedDate < cutoff) continue;
+
+      out.push({
+        title,
+        link,
+        source: sourceName,
+        sourceType: 'rss',
+        publishedAt: rawDate,
+        snippet: pickSnippet(item),
+        author: pickAuthor(item),
+      });
     }
+    return out;
+  } catch {
+    return [];
   }
+}
 
-  return {
-    kept,
-    dropped,
-    stats: {
-      total: articles.length,
-      kept: kept.length,
-      dropped: dropped.length,
-      undated: undatedCount,
-    },
-  };
+export async function searchRss(
+  company: Company,
+  extraTerms: string[] = [],
+): Promise<Article[]> {
+  const feeds = company.rssFeeds ?? [];
+  const lookbackHours = getLookbackHours();
+  const cutoff = new Date(Date.now() - lookbackHours * 3_600_000);
+
+  const results = await Promise.all(feeds.map((f) => fetchOne(f.url, f.source, cutoff)));
+  const all = results.flat();
+
+  if (extraTerms.length === 0) return all;
+
+  const lowered = extraTerms.map((t) => t.toLowerCase());
+  return all.filter((a) => {
+    const hay = `${a.title} ${a.snippet ?? ''}`.toLowerCase();
+    return lowered.some((t) => hay.includes(t));
+  });
 }
