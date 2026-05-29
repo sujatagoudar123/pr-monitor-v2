@@ -41,13 +41,13 @@ export const COMPANIES: Company[] = [
       // Categories
       'pharmaceutical', 'biotech', 'Pharma', 'Vaccine', 'Drug price',
       // Shingles franchise
-      'Shingles', 'SHINGRIX', 'herpes zoster', 'Thrive@50+', Leonard Friedland’, ‘Julie Bowen’, ‘Ty Burrell’, ‘Modern Family’
+      'Shingles', 'SHINGRIX', 'herpes zoster', 'Thrive@50+', 'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family'
       // Meningitis franchise
-      'Meningitis', 'Meningococcal', 'Bexsero', 'Menveo', 'Ask2BSure', ‘Leonard Friedland’, ‘Julie Bowen’, ‘Ty Burrell’, ‘Modern Family’, 'MenABCWY', 'MenACWY',
+      'Meningitis', 'Meningococcal', 'Bexsero', 'Menveo', 'Ask2BSure', 'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family', 'MenABCWY', 'MenACWY',
       // RSV
-      'RSV', 'respiratory syncytial virus', 'Arexvy', ‘Clesrovimab’, ‘Nirsevimab’, ‘Beyfortus’
+      'RSV', 'respiratory syncytial virus', 'Arexvy', 'Clesrovimab', 'Nirsevimab', 'Beyfortus'
       // Flu
-      'Influenza', 'Flu', 'Fluarix', 'Flulaval', 'FluMist', ‘Clesrovimab’, ‘Nirsevimab’, ‘Beyfortus’, ‘Ask2BSure’, ‘Penbraya’
+      'Influenza', 'Flu', 'Fluarix', 'Flulaval', 'FluMist', 'Clesrovimab', 'Nirsevimab', 'Beyfortus', 'Ask2BSure', 'Penbraya'
       // Other diseases
       'Abrysvo',
       // Key spokespeople / influencers from Detailed Search Terms
