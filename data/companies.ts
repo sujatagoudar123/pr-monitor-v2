@@ -43,8 +43,7 @@ export const COMPANIES: Company[] = [
       // Shingles franchise
       'Shingles', 'SHINGRIX', 'herpes zoster', 'Thrive@50+', Leonard Friedland’, ‘Julie Bowen’, ‘Ty Burrell’, ‘Modern Family’
       // Meningitis franchise
-      'Meningitis', 'Meningococcal', 'Bexsero', 'Menveo', 'Ask2BSure', ‘Leonard Friedland’, ‘Julie Bowen’, ‘Ty Burrell’, ‘Modern Family’
-      'MenABCWY', 'MenACWY',
+      'Meningitis', 'Meningococcal', 'Bexsero', 'Menveo', 'Ask2BSure', ‘Leonard Friedland’, ‘Julie Bowen’, ‘Ty Burrell’, ‘Modern Family’, 'MenABCWY', 'MenACWY',
       // RSV
       'RSV', 'respiratory syncytial virus', 'Arexvy', ‘Clesrovimab’, ‘Nirsevimab’, ‘Beyfortus’
       // Flu
