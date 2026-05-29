@@ -1,74 +1,105 @@
 /**
- * RSS source — parses the curated feeds for a given company.
- * Each feed has a 9-second timeout; failures fall through silently.
- *
- * 72h filtering: applied here at the source. We parse pubDate from each item
- * and drop anything older than the lookback window. Items with no pubDate
- * are KEPT (they get flagged `undated` later by the freshness filter).
+ * Freshness filter — keeps only articles published within the configured
+ * lookback window. Articles with no parseable publishedAt are KEPT but
+ * marked `undated: true` so the UI can show a badge.
  */
 
-import Parser from 'rss-parser';
-import type { Article, Company } from '@/lib/types';
-import { getLookbackHours, parsePublishedAt } from '@/lib/freshness';
+export const DEFAULT_LOOKBACK_HOURS = 72;
 
-const parser = new Parser({
-  timeout: 9000,
-  headers: { 'User-Agent': 'pr-monitor-agent/2.1 (+vercel)' },
-});
-
-async function fetchOne(
-  feedUrl: string,
-  sourceName: string,
-  cutoff: Date,
-): Promise<Article[]> {
-  try {
-    const feed = await parser.parseURL(feedUrl);
-    const items = feed.items ?? [];
-    const out: Article[] = [];
-    for (const item of items.slice(0, 80)) {
-      const title = (item.title ?? '').trim();
-      const link = (item.link ?? item.guid ?? '').trim();
-      if (!title || !link) continue;
-
-      const rawDate = item.isoDate ?? item.pubDate ?? null;
-      const parsedDate = parsePublishedAt(rawDate);
-
-      // Source-level freshness filter: drop dated items older than cutoff.
-      // Undated items (parsedDate === null) are KEPT — handled downstream.
-      if (parsedDate && parsedDate < cutoff) continue;
-
-      out.push({
-        title,
-        link,
-        source: sourceName,
-        sourceType: 'rss',
-        publishedAt: rawDate,
-        snippet: (item.contentSnippet ?? item.summary ?? '').slice(0, 400),
-      });
-    }
-    return out;
-  } catch {
-    return [];
-  }
+export function getLookbackHours(): number {
+  const raw = process.env.FRESHNESS_HOURS;
+  if (!raw) return DEFAULT_LOOKBACK_HOURS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_LOOKBACK_HOURS;
+  return n;
 }
 
-export async function searchRss(
-  company: Company,
-  extraTerms: string[] = [],
-): Promise<Article[]> {
-  const feeds = company.rssFeeds ?? [];
-  const lookbackHours = getLookbackHours();
-  const cutoff = new Date(Date.now() - lookbackHours * 3_600_000);
+export function parsePublishedAt(input: unknown): Date | null {
+  if (!input) return null;
+  if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
+  if (typeof input === 'number') {
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof input === 'string') {
+    const s = input.trim();
+    if (!s) return null;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+    const asNum = Number(s);
+    if (Number.isFinite(asNum) && asNum > 1_000_000_000) {
+      const d2 = new Date(asNum < 1e12 ? asNum * 1000 : asNum);
+      if (!isNaN(d2.getTime())) return d2;
+    }
+    return null;
+  }
+  return null;
+}
 
-  const results = await Promise.all(feeds.map((f) => fetchOne(f.url, f.source, cutoff)));
-  const all = results.flat();
+export interface FreshnessTagged<T> {
+  article: T;
+  publishedAt: Date | null;
+  undated: boolean;
+  withinWindow: boolean;
+  ageHours: number | null;
+}
 
-  if (extraTerms.length === 0) return all;
+export function tagFreshness<T extends { publishedAt?: unknown }>(
+  article: T,
+  lookbackHours: number = getLookbackHours(),
+  now: Date = new Date(),
+): FreshnessTagged<T> {
+  const parsed = parsePublishedAt(article.publishedAt);
+  if (!parsed) {
+    return {
+      article,
+      publishedAt: null,
+      undated: true,
+      withinWindow: true,
+      ageHours: null,
+    };
+  }
+  const ageHours = (now.getTime() - parsed.getTime()) / 3_600_000;
+  return {
+    article,
+    publishedAt: parsed,
+    undated: false,
+    withinWindow: ageHours >= -1 && ageHours <= lookbackHours,
+    ageHours,
+  };
+}
 
-  // Optional client-side filter when the agent asked for specific terms
-  const lowered = extraTerms.map((t) => t.toLowerCase());
-  return all.filter((a) => {
-    const hay = `${a.title} ${a.snippet ?? ''}`.toLowerCase();
-    return lowered.some((t) => hay.includes(t));
-  });
+export function applyFreshness<T extends { publishedAt?: unknown }>(
+  articles: T[],
+  lookbackHours: number = getLookbackHours(),
+  now: Date = new Date(),
+): {
+  kept: Array<T & { undated: boolean; ageHours: number | null }>;
+  dropped: T[];
+  stats: { total: number; kept: number; dropped: number; undated: number };
+} {
+  const kept: Array<T & { undated: boolean; ageHours: number | null }> = [];
+  const dropped: T[] = [];
+  let undatedCount = 0;
+
+  for (const a of articles) {
+    const t = tagFreshness(a, lookbackHours, now);
+    if (t.withinWindow) {
+      if (t.undated) undatedCount += 1;
+      kept.push({ ...a, undated: t.undated, ageHours: t.ageHours });
+    } else {
+      dropped.push(a);
+    }
+  }
+
+  return {
+    kept,
+    dropped,
+    stats: {
+      total: articles.length,
+      kept: kept.length,
+      dropped: dropped.length,
+      undated: undatedCount,
+    },
+  };
 }
