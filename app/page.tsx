@@ -189,21 +189,22 @@ export default function Page() {
         {/* Company chips */}
         {companies.length > 0 && (
           <section className="mb-8">
-            <div className="text-xs uppercase tracking-widest text-muted mb-3">Monitored Companies</div>
+            <div className="text-xs uppercase tracking-widest text-muted mb-3">Monitored Companies — hover/tap pencil to edit keywords</div>
             <div className="flex flex-wrap gap-2">
               {companies.map((c) => (
-                <div key={c.name} className="group inline-flex items-center gap-2">
+                <div key={c.name} className="inline-flex items-center gap-1 bg-white border border-border rounded-full pl-1 pr-1 hover:border-navy hover:shadow-soft transition-all">
                   <button
                     onClick={() => { setQuery(c.name); runSearch(c.name); }}
-                    className="px-4 py-2 rounded-full bg-white border border-border hover:border-navy hover:shadow-soft transition-all text-sm font-medium text-navy"
+                    className="px-3 py-2 text-sm font-medium text-navy"
                   >
                     {c.name}
                     <span className="ml-2 text-xs text-muted">{c.keywords.length}kw · {c.feedCount}feeds</span>
                   </button>
                   <button
                     onClick={() => { setEditingKeywords(c.name); setEditValue(c.keywords.join(', ')); }}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted hover:text-navy"
+                    className="p-1.5 text-muted hover:text-navy hover:bg-ivory rounded-full transition-colors"
                     title="Edit keywords"
+                    aria-label={`Edit keywords for ${c.name}`}
                   >
                     <Edit3 size={14}/>
                   </button>
