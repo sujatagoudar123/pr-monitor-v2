@@ -107,9 +107,27 @@ export async function runAgentLoop(
   const trace: string[] = [];
   let toolCallCount = 0;
 
+  // Split keywords for the agent's reference. The agent should focus extra_terms
+  // searches on company-specific terms (products/people/brands), not generic ones,
+  // because generic terms produce noise.
+  const GENERIC = new Set([
+    'pharmaceutical', 'biotech', 'pharma', 'vaccine', 'vaccines',
+    'drug', 'drugs', 'cancer', 'oncology', 'flu', 'influenza',
+    'hvac', 'refrigeration', 'sustainability', 'cooling',
+    'doctor', 'nurse', 'pharmacist', 'physician', 'psychiatrist',
+    'practitioner', 'anesthesiologist', 'surgeon',
+    'drug price', 'drug prices', 'drug pricing', 'drug cost', 'drug costs',
+  ]);
+  const specificKeywords = company.keywords.filter((k) => !GENERIC.has(k.toLowerCase().trim()));
+  const genericKeywords = company.keywords.filter((k) => GENERIC.has(k.toLowerCase().trim()));
+
   const systemMsg =
     `You are a research agent for a PR monitoring tool. Your job: gather articles about "${company.name}" from the LAST 72 HOURS only.\n\n` +
-    `Keywords/topics the user cares about:\n${company.keywords.map((k) => `  - ${k}`).join('\n')}\n\n` +
+    `COMPANY-SPECIFIC KEYWORDS (use these as extra_terms — each unambiguously refers to ${company.name}):\n` +
+    `${specificKeywords.map((k) => `  - ${k}`).join('\n')}\n\n` +
+    (genericKeywords.length
+      ? `GENERIC INDUSTRY TERMS (do NOT use these as extra_terms — they produce too much noise. Articles matching only these will be dropped at ranking):\n${genericKeywords.map((k) => `  - ${k}`).join('\n')}\n\n`
+      : '') +
     `Available sources at runtime:\n` +
     `  - search_rss_feeds        (always — REQUIRED)\n` +
     `  - search_google_news      (always — REQUIRED)\n` +
@@ -117,14 +135,15 @@ export async function runAgentLoop(
     `  - search_bing_news        (${bingNewsAvailable() ? 'available' : 'NO KEY — do not call'})\n` +
     `  - scrape_publications     (always — REQUIRED)\n\n` +
     `RULES:\n` +
-    `1. All sources already filter to the last 72 hours at the source. You don't need to worry about freshness — just gather widely.\n` +
+    `1. All sources already filter to the last 72 hours at the source. Gather widely; freshness is handled for you.\n` +
     `2. You MUST call search_rss_feeds, search_google_news, AND scrape_publications at least once before you are allowed to call finalize.\n` +
-    `3. If a required source returns few articles, use extra_terms (product/brand names from the keyword list) and retry once.\n` +
-    `4. Hard cap: ${MAX_TOOL_CALLS} tool calls total.\n` +
-    `5. After all required sources have been called, evaluate breadth and call finalize when you have meaningful coverage (typically 50+ raw articles across sources).`;
+    `3. Iter 0: search just the company name. Iter 1+: use 3-5 of the COMPANY-SPECIFIC keywords above as extra_terms to broaden coverage. Cycle through different keyword subsets across iterations so all product/brand/person names get queried.\n` +
+    `4. NEVER use generic industry terms as extra_terms — they return too much off-topic noise.\n` +
+    `5. Hard cap: ${MAX_TOOL_CALLS} tool calls total.\n` +
+    `6. After all required sources have been called, evaluate breadth and call finalize when you have meaningful coverage (typically 50+ raw articles across sources).`;
 
   const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: `Research "${company.name}" for today's brief. Use ALL required tools (rss, google_news, scrape), then finalize.` },
+    { role: 'user', content: `Research "${company.name}" for today's brief. Use ALL required tools (rss, google_news, scrape), use COMPANY-SPECIFIC keywords as extra_terms, then finalize.` },
   ];
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
