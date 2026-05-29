@@ -7,10 +7,11 @@ export type SourceType = 'rss' | 'google_news' | 'newsapi' | 'bing_news' | 'scra
 export interface Article {
   title: string;
   link: string;
-  source: string;          // human-readable source name (e.g. "BBC", "FiercePharma")
+  source: string;          // human-readable publication name (e.g. "BBC", "FiercePharma")
   sourceType: SourceType;
   publishedAt?: string | null;
-  snippet?: string;
+  snippet?: string;        // first ~800 chars of content
+  author?: string | null;  // when source exposes it (RSS only, usually)
   // Set by ranking stage:
   matchedKeywords?: string[];
   whyPicked?: string;
@@ -24,5 +25,5 @@ export interface Company {
   name: string;
   keywords: string[];
   rssFeeds: Array<{ url: string; source: string }>;
-  scrapeTargets?: string[]; // domains the scraper should sweep for this company
+  scrapeTargets?: string[];
 }
