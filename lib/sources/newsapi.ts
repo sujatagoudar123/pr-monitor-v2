@@ -1,9 +1,13 @@
 /**
  * NewsAPI.org source — only active if NEWSAPI_KEY is set.
  * Free tier is 100 requests/day.
+ *
+ * 72h filter at source: uses the `from=<ISO>` parameter so the API itself
+ * only returns articles within the window. Most efficient option.
  */
 
 import type { Article } from '@/lib/types';
+import { getLookbackHours } from '@/lib/freshness';
 
 export function newsApiAvailable(): boolean {
   return Boolean(process.env.NEWSAPI_KEY);
@@ -12,18 +16,18 @@ export function newsApiAvailable(): boolean {
 export async function searchNewsApi(
   company: string,
   extraTerms: string[] = [],
-  lookbackHours = 72,
 ): Promise<Article[]> {
   const key = process.env.NEWSAPI_KEY;
   if (!key) return [];
 
+  const lookbackHours = getLookbackHours();
   const fromDate = new Date(Date.now() - lookbackHours * 3_600_000).toISOString();
   const q = [company, ...extraTerms].map((t) => `"${t}"`).join(' OR ');
   const url =
     `https://newsapi.org/v2/everything` +
     `?q=${encodeURIComponent(q)}` +
     `&from=${encodeURIComponent(fromDate)}` +
-    `&sortBy=publishedAt&language=en&pageSize=50`;
+    `&sortBy=publishedAt&language=en&pageSize=80`;
 
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 9000);
