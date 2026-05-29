@@ -2,8 +2,8 @@
  * NewsAPI.org source — only active if NEWSAPI_KEY is set.
  * Free tier is 100 requests/day.
  *
- * 72h filter at source: uses the `from=<ISO>` parameter so the API itself
- * only returns articles within the window. Most efficient option.
+ * 72h filter at source: uses `from=<ISO>` so the API itself only returns
+ * articles within the window. Most efficient option.
  */
 
 import type { Article } from '@/lib/types';
@@ -36,7 +36,7 @@ export async function searchNewsApi(
     if (!res.ok) return [];
     const data = (await res.json()) as { articles?: Array<{
       title?: string; url?: string; source?: { name?: string };
-      publishedAt?: string; description?: string;
+      publishedAt?: string; description?: string; content?: string; author?: string;
     }> };
     return (data.articles ?? []).map((a): Article => ({
       title: (a.title ?? '').trim(),
@@ -44,7 +44,8 @@ export async function searchNewsApi(
       source: a.source?.name ?? 'NewsAPI',
       sourceType: 'newsapi',
       publishedAt: a.publishedAt ?? null,
-      snippet: (a.description ?? '').slice(0, 400),
+      snippet: ((a.content ?? a.description ?? '') as string).slice(0, 800),
+      author: a.author?.trim() || null,
     })).filter((a) => a.title && a.link);
   } catch {
     return [];
