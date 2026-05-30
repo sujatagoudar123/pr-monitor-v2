@@ -3,16 +3,23 @@
  *
  * Body: {
  *   company: "GSK",
- *   lookbackHours?: number   // optional override of the FRESHNESS_HOURS env var
+ *   lookbackHours?: number,    // optional override of FRESHNESS_HOURS env var
+ *   excludeSeen?: boolean,     // optional — when true, drops articles already
+ *                                 sent in previous cron runs (cron sends pass
+ *                                 this; manual UI searches do NOT).
  * }
  *
  * Pipeline:
  *   1. Agent loop gathers from required sources (each filtered at source)
  *   2. Dedupe by URL + title
- *   3. Apply freshness filter (defensive)
- *   4. Rank ranked articles 0.0-1.0
- *   5. Drop below MIN_RELEVANCE
- *   6. Write executive summary
+ *   3. Apply freshness filter (defensive — sources already filter)
+ *   4. Filter out previously-sent articles (only when excludeSeen=true)
+ *   5. Rank remaining articles 0.0-1.0
+ *   6. Drop below MIN_RELEVANCE
+ *   7. Write executive summary
+ *
+ * Seen-items filter runs BEFORE ranking so the LLM never spends tokens on
+ * articles that won't be sent.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -22,6 +29,7 @@ import { runAgentLoop } from '@/lib/agent/agent';
 import { dedupeArticles } from '@/lib/agent/dedupe';
 import { rankArticles, writeExecutiveSummary } from '@/lib/agent/rank';
 import { applyFreshness, getLookbackHours } from '@/lib/freshness';
+import { filterUnseen } from '@/lib/seen';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
   }
 
-  let body: { company?: string; lookbackHours?: number };
+  let body: { company?: string; lookbackHours?: number; excludeSeen?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -54,14 +62,12 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic({ apiKey });
   const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
-  // Use override from body if provided (cron passes per-slot lookback), else env var
   const lookbackHours =
     typeof body.lookbackHours === 'number' && body.lookbackHours > 0
       ? body.lookbackHours
       : getLookbackHours();
+  const excludeSeen = body.excludeSeen === true;
 
-  // Set FRESHNESS_HOURS for this request's lifetime so source connectors
-  // (rss/google-news/newsapi/bing) all pick up the per-slot value.
   const previousEnv = process.env.FRESHNESS_HOURS;
   process.env.FRESHNESS_HOURS = String(lookbackHours);
 
@@ -74,14 +80,23 @@ export async function POST(req: NextRequest) {
     const deduped = dedupeArticles(gathered);
     const afterDedupe = deduped.length;
 
-    // 3) Freshness (defensive — sources already filter)
+    // 3) Freshness filter
     const freshness = applyFreshness(deduped, lookbackHours);
-    const fresh = freshness.kept;
+    let fresh = freshness.kept;
 
-    // 4) Rank
+    // 4) Seen-items filter (BEFORE ranking, saves LLM tokens).
+    //    Only when caller asks (cron route). Manual UI searches show everything.
+    let alreadySeenSkipped = 0;
+    if (excludeSeen) {
+      const seenResult = await filterUnseen(company.name, fresh);
+      fresh = seenResult.unseen;
+      alreadySeenSkipped = seenResult.skipped;
+    }
+
+    // 5) Rank what remains
     const ranked = await rankArticles(client, model, company.name, company.keywords, fresh);
 
-    // 5) Summary
+    // 6) Summary
     const executiveSummary = await writeExecutiveSummary(client, model, company.name, ranked);
 
     return NextResponse.json({
@@ -93,9 +108,12 @@ export async function POST(req: NextRequest) {
         totalGathered,
         afterDedupe,
         lookbackHours,
-        afterFreshness: fresh.length,
+        afterFreshness: freshness.kept.length,
         droppedAsStale: freshness.stats.dropped,
         undated: freshness.stats.undated,
+        excludeSeen,
+        alreadySeenSkipped,
+        afterSeenFilter: fresh.length,
         afterRanking: ranked.length,
         sourcesUsed,
       },
@@ -107,7 +125,6 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   } finally {
-    // Restore env so concurrent requests don't see our override
     if (previousEnv === undefined) delete process.env.FRESHNESS_HOURS;
     else process.env.FRESHNESS_HOURS = previousEnv;
   }
