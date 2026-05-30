@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { SCHEDULE } from '@/config/schedule';
 import { getLookbackHours } from '@/lib/freshness';
+import { seenStatus } from '@/lib/seen';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -26,7 +27,9 @@ export async function GET() {
       PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL ?? null,
       VERCEL_URL: process.env.VERCEL_URL ?? null,
       FRESHNESS_HOURS: getLookbackHours(),
+      BLOB_READ_WRITE_TOKEN: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
     },
+    seenTracker: seenStatus(),
     schedule: SCHEDULE.map((s) => ({
       id: s.id,
       label: s.label,
