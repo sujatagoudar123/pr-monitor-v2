@@ -6,7 +6,7 @@
   "functions": {
     "app/api/agent-search/route.ts": { "maxDuration": 300 },
     "app/api/send-email/route.ts": { "maxDuration": 60 },
-    "app/api/cron-send/route.ts": { "maxDuration": 600 }
+    "app/api/cron-send/route.ts": { "maxDuration": 300 }
   },
   "crons": [
     { "path": "/api/cron-send?slot=slot-0500-utc", "schedule": "40 4 * * *" },
