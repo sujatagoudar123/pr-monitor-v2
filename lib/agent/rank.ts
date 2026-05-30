@@ -26,11 +26,16 @@ const MIN_RELEVANCE = 0.4;
  * the company itself.
  */
 const GENERIC_INDUSTRY_TERMS = new Set([
+  // Pharma generic
   'pharmaceutical', 'biotech', 'pharma', 'vaccine', 'vaccines',
   'drug', 'drugs', 'cancer', 'oncology', 'flu', 'influenza',
+  'respiratory', 'meningitis', 'shingles',
+  // HVAC generic
   'hvac', 'refrigeration', 'sustainability', 'cooling',
+  // Healthcare worker categories (Indivior uses these but they're generic)
   'doctor', 'nurse', 'pharmacist', 'physician', 'psychiatrist',
   'practitioner', 'anesthesiologist', 'surgeon',
+  // Drug-pricing policy generic
   'drug price', 'drug prices', 'drug pricing', 'drug cost', 'drug costs',
 ]);
 
