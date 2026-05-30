@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSlot, resolveRecipients, SCHEDULE } from '@/config/schedule';
 import { applyFreshness, getLookbackHours } from '@/lib/freshness';
+import { markSent } from '@/lib/seen';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -34,6 +35,7 @@ interface AgentSearchResponse {
     matchedKeywords?: string[]; whyPicked?: string; relevanceScore?: number;
     undated?: boolean; ageHours?: number | null;
   }>;
+  stats?: Record<string, unknown>;
 }
 
 function verifyCronAuth(req: NextRequest): { ok: true } | { ok: false; reason: string } {
@@ -55,11 +57,15 @@ function baseUrl(req: NextRequest): string {
   return req.nextUrl.origin;
 }
 
-async function runAgentForCompany(origin: string, company: string): Promise<AgentSearchResponse> {
+async function runAgentForCompany(
+  origin: string,
+  company: string,
+  lookbackHours: number,
+): Promise<AgentSearchResponse> {
   const res = await fetch(`${origin}/api/agent-search`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ company }),
+    body: JSON.stringify({ company, lookbackHours, excludeSeen: true }),
     cache: 'no-store',
   });
   if (!res.ok) {
@@ -103,18 +109,22 @@ export async function GET(req: NextRequest) {
   }
 
   const origin = baseUrl(req);
-  const lookbackHours = getLookbackHours();
+  const slotLookback = slot.lookbackHours ?? getLookbackHours();
   const startedAt = new Date().toISOString();
   const perCompany: Array<Record<string, unknown>> = [];
 
   // Sequential — keeps concurrent token use predictable, gives each company
   // its full share of maxDuration headroom.
+  //
+  // Duplicate-article prevention is handled by per-slot lookbackHours
+  // (see config/schedule.ts): send 1 looks back 72h, sends 2 and 3 look
+  // back ~6h, so the same article rarely appears in two same-day sends.
   for (const company of slot.companies) {
     const companyStart = Date.now();
     try {
-      const agent = await runAgentForCompany(origin, company);
+      const agent = await runAgentForCompany(origin, company, slotLookback);
 
-      const filtered = applyFreshness(agent.articles ?? [], lookbackHours);
+      const filtered = applyFreshness(agent.articles ?? [], slotLookback);
       const articles = filtered.kept;
       const isEmpty = articles.length === 0;
 
@@ -137,16 +147,29 @@ export async function GET(req: NextRequest) {
         articles,
         keywords: agent.keywordsUsed ?? [],
         executiveSummary: isEmpty
-          ? `No significant ${company} news in the last ${lookbackHours} hours.`
+          ? `No significant ${company} news in the last ${slotLookback} hours.`
           : agent.executiveSummary,
         slotLabel: slot.label,
         isEmpty,
       });
 
+      // Mark URLs as sent ONLY after the email succeeded — a failed email
+      // should NOT mark articles seen, so the next cron retries them.
+      if (emailRes.ok && articles.length > 0) {
+        try {
+          await markSent(company, articles.map((a) => a.link));
+        } catch (err) {
+          // Non-fatal — log and continue. Next run may resend, which is
+          // acceptable degraded behavior.
+          console.warn(`[cron] markSent failed for ${company}:`, err);
+        }
+      }
+
       perCompany.push({
         company,
         status: emailRes.ok ? 'sent' : 'email_failed',
         articleCount: articles.length,
+        alreadySeenSkipped: (agent.stats as Record<string, unknown> | undefined)?.alreadySeenSkipped ?? 0,
         isEmpty,
         recipients: { to, cc },
         emailStatus: emailRes.status,
@@ -168,7 +191,7 @@ export async function GET(req: NextRequest) {
     label: slot.label,
     startedAt,
     finishedAt: new Date().toISOString(),
-    lookbackHours,
+    lookbackHours: slotLookback,
     results: perCompany,
   });
 }
