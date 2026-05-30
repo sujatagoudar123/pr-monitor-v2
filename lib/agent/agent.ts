@@ -113,6 +113,7 @@ export async function runAgentLoop(
   const GENERIC = new Set([
     'pharmaceutical', 'biotech', 'pharma', 'vaccine', 'vaccines',
     'drug', 'drugs', 'cancer', 'oncology', 'flu', 'influenza',
+    'respiratory', 'meningitis', 'shingles',
     'hvac', 'refrigeration', 'sustainability', 'cooling',
     'doctor', 'nurse', 'pharmacist', 'physician', 'psychiatrist',
     'practitioner', 'anesthesiologist', 'surgeon',
