@@ -6,16 +6,16 @@
   "functions": {
     "app/api/agent-search/route.ts": { "maxDuration": 300 },
     "app/api/send-email/route.ts": { "maxDuration": 60 },
-    "app/api/cron-send/route.ts": { "maxDuration": 300 }
+    "app/api/cron-send/route.ts": { "maxDuration": 600 }
   },
   "crons": [
-    { "path": "/api/cron-send?slot=slot-0500-utc", "schedule": "55 4 * * *" },
-    { "path": "/api/cron-send?slot=slot-0530-utc", "schedule": "25 5 * * *" },
-    { "path": "/api/cron-send?slot=slot-0600-utc", "schedule": "55 5 * * *" },
-    { "path": "/api/cron-send?slot=slot-1000-utc", "schedule": "55 9 * * *" },
-    { "path": "/api/cron-send?slot=slot-1100-utc", "schedule": "55 10 * * *" },
-    { "path": "/api/cron-send?slot=slot-1130-utc", "schedule": "25 11 * * *" },
-    { "path": "/api/cron-send?slot=slot-1200-utc", "schedule": "55 11 * * *" },
-    { "path": "/api/cron-send?slot=slot-1400-utc", "schedule": "55 13 * * *" }
+    { "path": "/api/cron-send?slot=slot-0500-utc", "schedule": "40 4 * * *" },
+    { "path": "/api/cron-send?slot=slot-0530-utc", "schedule": "10 5 * * *" },
+    { "path": "/api/cron-send?slot=slot-0600-utc", "schedule": "40 5 * * *" },
+    { "path": "/api/cron-send?slot=slot-1000-utc", "schedule": "40 9 * * *" },
+    { "path": "/api/cron-send?slot=slot-1100-utc", "schedule": "40 10 * * *" },
+    { "path": "/api/cron-send?slot=slot-1130-utc", "schedule": "10 11 * * *" },
+    { "path": "/api/cron-send?slot=slot-1200-utc", "schedule": "40 11 * * *" },
+    { "path": "/api/cron-send?slot=slot-1400-utc", "schedule": "40 13 * * *" }
   ]
 }
