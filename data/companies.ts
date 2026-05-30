@@ -29,41 +29,46 @@ export const COMPANIES: Company[] = [
   {
     name: 'GSK',
     keywords: [
+      // Company / leadership
       'GSK',
       'GlaxoSmithKline',
       'Emma Walmsley',
+      // Categories
       'pharmaceutical',
       'biotech',
       'Pharma',
-      'Vaccine',
-      'Drug price',
-      'Shingles',
-      'SHINGRIX',
-      'herpes zoster',
-      'Thrive@50+',
-      'Meningitis',
+      'vaccine',
+      // RSV franchise — GSK products + competitors
+      'RSV',
+      'respiratory',
+      'respiratory syncytial virus',
+      'Arexvy',
+      'Abrysvo',         // Pfizer (competitor)
+      'Clesrovimab',     // Merck (competitor)
+      'Nirsevimab',      // generic / pipeline
+      'Beyfortus',       // Sanofi / AstraZeneca (competitor)
+      // Shingles franchise
+      'shingles',
+      'Shingrix',
+      // Meningitis franchise — GSK products + competitors + campaigns
+      'meningitis',
       'Meningococcal',
       'Bexsero',
       'Menveo',
-      'Ask2BSure',
-      'MenABCWY',
-      'MenACWY',
-      'RSV',
-      'respiratory syncytial virus',
-      'Arexvy',
-      'Influenza',
+      'Penbraya',        // Pfizer (competitor)
+      'Ask2BSure',       // GSK awareness campaign
+      // Flu franchise
       'Flu',
-      'Fluarix',
+      'Influenza',
       'Flulaval',
+      'Fluarix',
       'FluMist',
-      'Malaria',
-      'Abrysvo',
-      'Len Friedland',
-      'Jenn Sherman',
-      'Arti Thangudu',
-      'Lisa Breckenridge',
-      'Daisy Kent',
-      'Greg Olsen',
+      // Campaign / Spokespeople
+      'Thrive@50+',
+      'Leonard Friedland',
+      'Julie Bowen',
+      'Ty Burrell',
+      'Modern Family',
     ],
     rssFeeds: feeds(
       'bbc',  // BBC
