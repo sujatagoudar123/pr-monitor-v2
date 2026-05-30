@@ -1,4 +1,4 @@
-# PR Monitor Agent v2.1 — Complete Deployable Codebase
+# PR Monitor Agent v1 — Complete Deployable Codebase
 
 A production-ready, Claude-powered PR monitoring agent with **72-hour freshness filtering** and **automated scheduled emails** via Vercel Cron.
 
