@@ -1,131 +1,98 @@
 /**
- * POST /api/agent-search
+ * Tracks article URLs already sent, so we don't email the same story twice.
  *
- * Body: {
- *   company: "GSK",
- *   lookbackHours?: number,    // optional override of FRESHNESS_HOURS env var
- *   excludeSeen?: boolean,     // optional — when true, drops articles already
- *                                 sent in previous cron runs (cron sends pass
- *                                 this; manual UI searches do NOT).
- * }
- *
- * Pipeline:
- *   1. Agent loop gathers from required sources (each filtered at source)
- *   2. Dedupe by URL + title
- *   3. Apply freshness filter (defensive — sources already filter)
- *   4. Filter out previously-sent articles (only when excludeSeen=true)
- *   5. Rank remaining articles 0.0-1.0
- *   6. Drop below MIN_RELEVANCE
- *   7. Write executive summary
- *
- * Seen-items filter runs BEFORE ranking so the LLM never spends tokens on
- * articles that won't be sent.
+ * Storage: Vercel Blob (one JSON file per company at seen/<company>.json)
+ * Fail-open: if Blob isn't configured or errors, sending continues normally.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import { NextRequest, NextResponse } from 'next/server';
-import { getCompany } from '@/data/companies';
-import { runAgentLoop } from '@/lib/agent/agent';
-import { dedupeArticles } from '@/lib/agent/dedupe';
-import { rankArticles, writeExecutiveSummary } from '@/lib/agent/rank';
-import { applyFreshness, getLookbackHours } from '@/lib/freshness';
-import { filterUnseen } from '@/lib/seen';
+import { list, put, del } from '@vercel/blob';
 
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-export const maxDuration = 300;
+const TTL_MS = 14 * 24 * 3600 * 1000; // remember URLs for 14 days
 
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+function key(company: string): string {
+  const slug = company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return `seen/${slug}.json`;
+}
 
-export async function POST(req: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
-  }
-
-  let body: { company?: string; lookbackHours?: number; excludeSeen?: boolean };
+function normalize(url: string): string {
   try {
-    body = await req.json();
+    const u = new URL(url);
+    u.hash = '';
+    u.search = ''; // strip query strings (UTMs, etc.)
+    return u.toString().toLowerCase().replace(/\/$/, '');
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    return url.toLowerCase();
   }
+}
 
-  const companyName = (body.company ?? '').trim();
-  if (!companyName) {
-    return NextResponse.json({ error: 'Field "company" is required' }, { status: 400 });
-  }
-
-  const company = getCompany(companyName);
-  if (!company) {
-    return NextResponse.json({ error: `Unknown company: ${companyName}` }, { status: 404 });
-  }
-
-  const client = new Anthropic({ apiKey });
-  const model = process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
-  const lookbackHours =
-    typeof body.lookbackHours === 'number' && body.lookbackHours > 0
-      ? body.lookbackHours
-      : getLookbackHours();
-  const excludeSeen = body.excludeSeen === true;
-
-  const previousEnv = process.env.FRESHNESS_HOURS;
-  process.env.FRESHNESS_HOURS = String(lookbackHours);
-
+async function read(company: string): Promise<Record<string, number>> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return {};
   try {
-    // 1) Agent gathers
-    const { articles: gathered, sourcesUsed, trace } = await runAgentLoop(client, model, company);
-    const totalGathered = gathered.length;
-
-    // 2) Dedupe
-    const deduped = dedupeArticles(gathered);
-    const afterDedupe = deduped.length;
-
-    // 3) Freshness filter
-    const freshness = applyFreshness(deduped, lookbackHours);
-    let fresh = freshness.kept;
-
-    // 4) Seen-items filter (BEFORE ranking, saves LLM tokens).
-    //    Only when caller asks (cron route). Manual UI searches show everything.
-    let alreadySeenSkipped = 0;
-    if (excludeSeen) {
-      const seenResult = await filterUnseen(company.name, fresh);
-      fresh = seenResult.unseen;
-      alreadySeenSkipped = seenResult.skipped;
-    }
-
-    // 5) Rank what remains
-    const ranked = await rankArticles(client, model, company.name, company.keywords, fresh);
-
-    // 6) Summary
-    const executiveSummary = await writeExecutiveSummary(client, model, company.name, ranked);
-
-    return NextResponse.json({
-      company: company.name,
-      keywordsUsed: company.keywords,
-      executiveSummary,
-      articles: ranked,
-      stats: {
-        totalGathered,
-        afterDedupe,
-        lookbackHours,
-        afterFreshness: freshness.kept.length,
-        droppedAsStale: freshness.stats.dropped,
-        undated: freshness.stats.undated,
-        excludeSeen,
-        alreadySeenSkipped,
-        afterSeenFilter: fresh.length,
-        afterRanking: ranked.length,
-        sourcesUsed,
-      },
-      trace,
-    });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Agent failed' },
-      { status: 500 },
-    );
-  } finally {
-    if (previousEnv === undefined) delete process.env.FRESHNESS_HOURS;
-    else process.env.FRESHNESS_HOURS = previousEnv;
+    const result = await list({ prefix: key(company), limit: 5 });
+    const blob = result.blobs.find((b) => b.pathname === key(company));
+    if (!blob) return {};
+    const res = await fetch(blob.url, { cache: 'no-store' });
+    if (!res.ok) return {};
+    const parsed = JSON.parse(await res.text());
+    return typeof parsed === 'object' && parsed ? parsed : {};
+  } catch {
+    return {};
   }
+}
+
+async function write(company: string, map: Record<string, number>): Promise<void> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  // Prune expired entries before writing so the file stays small
+  const cutoff = Date.now() - TTL_MS;
+  const pruned: Record<string, number> = {};
+  for (const [url, ts] of Object.entries(map)) {
+    if (ts >= cutoff) pruned[url] = ts;
+  }
+  try {
+    // @vercel/blob 0.27 can't overwrite — delete first, then put
+    const existing = await list({ prefix: key(company), limit: 5 });
+    const oldUrls = existing.blobs.filter((b) => b.pathname === key(company)).map((b) => b.url);
+    if (oldUrls.length) await del(oldUrls);
+    await put(key(company), JSON.stringify(pruned), {
+      access: 'public',
+      contentType: 'application/json',
+      addRandomSuffix: false,
+    });
+  } catch {
+    // silent — fail-open
+  }
+}
+
+/** Drop articles we've already sent. Returns the unseen subset. */
+export async function filterUnseen<T extends { link: string }>(
+  company: string,
+  articles: T[],
+): Promise<{ unseen: T[]; skipped: number }> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN || articles.length === 0) {
+    return { unseen: articles, skipped: 0 };
+  }
+  const seen = await read(company);
+  const unseen: T[] = [];
+  let skipped = 0;
+  for (const a of articles) {
+    if (a.link && normalize(a.link) in seen) skipped++;
+    else unseen.push(a);
+  }
+  return { unseen, skipped };
+}
+
+/** Record URLs as sent. Call AFTER a successful email. */
+export async function markSent(company: string, urls: string[]): Promise<void> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN || urls.length === 0) return;
+  const seen = await read(company);
+  const now = Date.now();
+  for (const url of urls) {
+    if (url) seen[normalize(url)] = now;
+  }
+  await write(company, seen);
+}
+
+/** For /api/health — tells you if it's enabled. */
+export function seenStatus() {
+  return { enabled: Boolean(process.env.BLOB_READ_WRITE_TOKEN) };
 }
