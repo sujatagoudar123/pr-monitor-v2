@@ -1,182 +1,404 @@
 /**
  * Companies data — names, keywords, and RSS feeds.
  *
- * Keywords are derived from the client's Excel sheets:
- *   GSK_Updated_Scope_and_Terms.xlsx  → GSK
- *   -Project-wise_Website_Monitoring_List_April_28_2026_Updated---.xlsx → all 7
+ * GENERATED from the master publication map (lib/publications.ts), itself
+ * derived from your Excel sheets + validation tests.
  *
- * Edit this file to add/remove keywords or feeds, then redeploy.
+ * Per-publication legal status:
+ *   ACTIVE — free public RSS feed, fetched on every run.
+ *   PAID   — RSS is subscription-only. Listed but COMMENTED OUT. Uncomment
+ *            after you have a subscription. See docs/subscriptions.md for
+ *            how to obtain access to each one.
+ *
+ * IMPORTANT: We intentionally do NOT include 'news.google.com/rss/search'
+ * proxy URLs from the YAML. Those are redundant — our google-news source
+ * already queries Google News dynamically across all publishers.
  */
 
 import type { Company } from '@/lib/types';
+import { PUBLICATIONS, type PublicationKey } from '@/lib/publications';
 
-// Shared general health feeds used by pharma companies
-const generalHealthFeeds = [
-  { url: 'https://feeds.feedburner.com/fiercepharma', source: 'FiercePharma' },
-  { url: 'https://www.statnews.com/feed/', source: 'STAT News' },
-  { url: 'https://endpts.com/feed/', source: 'Endpoints News' },
-  { url: 'https://feeds.bbci.co.uk/news/health/rss.xml', source: 'BBC Health' },
-  { url: 'https://feeds.feedburner.com/fiercebiotech', source: 'FierceBiotech' },
-];
-
-const generalAutoFeeds = [
-  { url: 'https://feeds.feedburner.com/autoblog', source: 'Autoblog' },
-  { url: 'https://www.autonews.com/rss', source: 'Auto News' },
-  { url: 'https://www.caranddriver.com/rss/all.xml/', source: 'Car and Driver' },
-];
-
-const generalBusinessFeeds = [
-  { url: 'https://feeds.bbci.co.uk/news/business/rss.xml', source: 'BBC Business' },
-  { url: 'https://feeds.reuters.com/reuters/businessNews', source: 'Reuters Business' },
-];
+function feeds(...keys: PublicationKey[]) {
+  return keys
+    .map((k) => PUBLICATIONS[k])
+    .filter((p) => p && p.status === 'active' && p.rss)
+    .map((p) => ({ url: p.rss as string, source: p.display_name }));
+}
 
 export const COMPANIES: Company[] = [
   {
     name: 'GSK',
-    // Per GSK_Updated_Scope_and_Terms.xlsx → Sheet "GSK" → "Keywords" column
-    // PLUS the products + people from the Detailed Search Terms sheet.
     keywords: [
-  // Company
-  'GSK', 'GlaxoSmithKline', 'Emma Walmsley',
-
-  // Categories
-  'pharmaceutical', 'biotech', 'Pharma', 'Vaccine', 'Drug price',
-
-  // Shingles franchise
-  'Shingles', 'SHINGRIX', 'herpes zoster', 'Thrive@50+',
-  'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family',
-
-  // Meningitis franchise
-  'Meningitis', 'Meningococcal', 'Bexsero', 'Menveo', 'Ask2BSure',
-  'Leonard Friedland', 'Julie Bowen', 'Ty Burrell', 'Modern Family',
-  'MenABCWY', 'MenACWY',
-
-  // RSV
-  'RSV', 'respiratory syncytial virus', 'Arexvy',
-  'Clesrovimab', 'Nirsevimab', 'Beyfortus',
-
-  // Flu
-  'Influenza', 'Flu', 'Fluarix', 'Flulaval', 'FluMist',
-  'Clesrovimab', 'Nirsevimab', 'Beyfortus',
-  'Ask2BSure', 'Penbraya',
-
-  // Other diseases
-  'Abrysvo',
-
-  // Key spokespeople / influencers
-  'Len Friedland', 'Jenn Sherman', 'Arti Thangudu',
-  'Lisa Breckenridge', 'Daisy Kent', 'Greg Olsen',
-],
-    rssFeeds: [
-      { url: 'https://www.gsk.com/en-gb/media/press-releases/rss/', source: 'GSK Press' },
-      { url: 'https://feeds.bbci.co.uk/news/rss.xml', source: 'BBC' },
-      { url: 'https://feeds.reuters.com/reuters/healthNews', source: 'Reuters Health' },
-      { url: 'https://www.channel4.com/news/feed', source: 'Channel 4 News' },
-      { url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html', source: 'CNBC' },
-      { url: 'http://rss.cnn.com/rss/cnn_topstories.rss', source: 'CNN' },
-      { url: 'https://feeds.npr.org/1001/rss.xml', source: 'NPR' },
-      { url: 'https://feeds.skynews.com/feeds/rss/home.xml', source: 'Sky News' },
-      { url: 'https://www.standard.co.uk/rss', source: 'Evening Standard' },
-      { url: 'https://www.dailymail.co.uk/articles.rss', source: 'Daily Mail' },
-      { url: 'https://www.express.co.uk/posts/rss/1/news', source: 'The Express' },
-      { url: 'https://www.theguardian.com/uk/rss', source: 'The Guardian' },
-      { url: 'https://thehill.com/rss/syndicator/19110', source: 'The Hill' },
-      
-      ...generalHealthFeeds,
+      'GSK',
+      'GlaxoSmithKline',
+      'Emma Walmsley',
+      'pharmaceutical',
+      'biotech',
+      'Pharma',
+      'Vaccine',
+      'Drug price',
+      'Shingles',
+      'SHINGRIX',
+      'herpes zoster',
+      'Thrive@50+',
+      'Meningitis',
+      'Meningococcal',
+      'Bexsero',
+      'Menveo',
+      'Ask2BSure',
+      'MenABCWY',
+      'MenACWY',
+      'RSV',
+      'respiratory syncytial virus',
+      'Arexvy',
+      'Influenza',
+      'Flu',
+      'Fluarix',
+      'Flulaval',
+      'FluMist',
+      'Malaria',
+      'Abrysvo',
+      'Len Friedland',
+      'Jenn Sherman',
+      'Arti Thangudu',
+      'Lisa Breckenridge',
+      'Daisy Kent',
+      'Greg Olsen',
     ],
+    rssFeeds: feeds(
+      'bbc',  // BBC
+      'bbc_health',  // BBC Health
+      'channel_4_news',  // Channel 4 News
+      'sky_news',  // Sky News
+      'the_guardian',  // The Guardian
+      'the_daily_mail',  // The Daily Mail
+      'the_mail_on_sunday',  // The Mail on Sunday
+      'the_express',  // The Express
+      'the_mirror',  // The Mirror
+      'evening_standard',  // Evening Standard
+      'this_is_money',  // This is Money
+      'abc_news',  // ABC News
+      'cbs_news',  // CBS News
+      'cbs_health',  // CBS Health
+      'nbc_news',  // NBC News
+      'nbc_health',  // NBC Health
+      'fox_news',  // FOX News
+      'fox_health',  // FOX News Health
+      'cnn',  // CNN
+      'cnn_health',  // CNN Health
+      'cnbc',  // CNBC
+      'cnbc_health',  // CNBC Health
+      'npr',  // NPR
+      'npr_health',  // NPR Health
+      'yahoo_news',  // Yahoo! News
+      'medcity_news',  // MedCity News
+      'medpage_today',  // MedPage Today
+      'medscape',  // Medscape
+      'healthline',  // Healthline
+      'healthcare_dive',  // Healthcare Dive
+      'pharmaceutical_technology',  // Pharmaceutical Technology
+      'medical_daily',  // Medical Daily
+      'medical_xpress',  // Medical Xpress
+      'pr_newswire',  // PR Newswire
+      'globe_newswire',  // GlobeNewswire
+      'jama_network',  // JAMA Network
+      'forbes',  // Forbes
+      'forbes_business',  // Forbes Business
+      'time_magazine',  // Time
+      'newsweek',  // Newsweek
+      'business_insider',  // Business Insider
+      // === PAID — uncomment after obtaining subscription. See docs/subscriptions.md ===
+      // 'bloomberg',  // Bloomberg (PAID)
+      // 'financial_times',  // Financial Times (PAID)
+      // 'wall_street_journal',  // Wall Street Journal (PAID)
+      // 'new_york_times',  // The New York Times (PAID)
+      // 'washington_post',  // The Washington Post (PAID)
+      // 'the_economist',  // The Economist (PAID)
+      // 'the_telegraph',  // The Telegraph (PAID)
+      // 'endpoints_news',  // Endpoints News (PAID)
+      // 'stat_news',  // STAT News (PAID)
+      // 'pink_sheet',  // Pink Sheet (PAID)
+      // 'scrip',  // Scrip (PAID)
+      // 'citeline',  // Citeline (Scrip / Pink Sheet / Medtech Insight / In Vivo) (PAID)
+      // 'firstword_pharma',  // FirstWord Pharma (PAID)
+      // 'the_pharma_letter',  // The Pharma Letter (PAID)
+      // 'medwatch',  // MedWatch (PAID)
+      // === Google News proxies — skipped (we query Google News dynamically) ===
+    ),
     scrapeTargets: ['fiercepharma.com', 'statnews.com', 'endpts.com'],
   },
   {
     name: 'Mazda',
-    // Per Project-wise sheet → Mazda
     keywords: [
       'Mazda',
-      'CX-30', 'CX-50', 'CX-90', 'CX-5', 'CX-9', 'CX-70',
-      'Mazda3', 'Mazda 3', 'MX-5 Miata',
+      'CX-30',
+      'CX-50',
+      'CX-90',
+      'CX-5',
+      'CX-9',
+      'CX-70',
+      'Mazda3',
+      'Mazda 3',
+      'MX-5 Miata',
       'Mazda Toyota Manufacturing',
     ],
-    rssFeeds: [
-      ...generalAutoFeeds,
-    ],
+    rssFeeds: feeds(
+      'autoblog',  // Autoblog
+      'car_and_driver',  // Car and Driver
+      'road_and_track',  // Road & Track
+      'jalopnik',  // Jalopnik
+      'carscoops',  // Carscoops.com
+      'motor1',  // Motor1
+      'autoweek',  // Autoweek
+      'topspeed',  // TopSpeed
+      'slashgear',  // SlashGear
+      'automoblog',  // Automoblog
+      'consumer_guide',  // Consumer Guide
+      'tflcar',  // TFLCar
+      'digital_trends',  // Digital Trends
+      'cnet',  // CNET
+      'ars_technica',  // Ars Technica
+      'gq',  // GQ
+      'mens_health',  // Men’s Health
+      'mens_journal',  // Men's Journal
+      'time_magazine',  // Time
+      'los_angeles_times',  // Los Angeles Times
+      'chicago_sun_times',  // Chicago Sun-Times
+      'philadelphia_inquirer',  // Philadelphia Inquirer
+      'newsweek',  // Newsweek
+      'cnbc',  // CNBC
+      'business_insider',  // Business Insider
+      'new_york_times_auto',  // New York Times (Autos)
+      // === PAID — uncomment after obtaining subscription. See docs/subscriptions.md ===
+      // 'new_york_times',  // The New York Times (PAID)
+      // 'wall_street_journal',  // Wall Street Journal (PAID)
+      // 'washington_post',  // The Washington Post (PAID)
+      // 'bloomberg',  // Bloomberg (PAID)
+      // 'automotive_news',  // Automotive News (PAID)
+      // === Google News proxies — skipped (we query Google News dynamically) ===
+    ),
     scrapeTargets: ['autonews.com'],
   },
   {
     name: 'Trane',
-    // Per Project-wise sheet → Trane (ACTUAL keywords are company + competitors)
     keywords: [
-      'Trane', 'Trane Technologies',
-      'Carrier Global', 'Johnson Controls',
-      'Daikin', 'Lennox International', 'METUS',
+      'Trane',
+      'Trane Technologies',
+      'Carrier Global',
+      'Johnson Controls',
+      'Daikin',
+      'Lennox International',
+      'METUS',
     ],
-    rssFeeds: [
-      ...generalBusinessFeeds,
-    ],
+    rssFeeds: feeds(
+      'abc_news',  // ABC News
+      'bbc',  // BBC
+      'bbc_business',  // BBC Business
+      'cbs_news',  // CBS News
+      'nbc_news',  // NBC News
+      'cnbc',  // CNBC
+      'the_hill',  // The Hill
+      'fast_company',  // Fast Company
+      'fortune',  // Fortune
+      'forbes',  // Forbes
+      'forbes_business',  // Forbes Business
+      'wired',  // Wired
+      'this_is_money',  // This is Money
+      'mens_journal',  // Men's Journal
+      'cooling_post',  // Cooling Post
+      'cleantechnica',  // CleanTechnica
+      // === PAID — uncomment after obtaining subscription. See docs/subscriptions.md ===
+      // 'bloomberg',  // Bloomberg (PAID)
+      // 'bloomberg_green',  // Bloomberg Green (PAID)
+      // 'financial_times',  // Financial Times (PAID)
+      // 'wall_street_journal',  // Wall Street Journal (PAID)
+      // 'new_york_times',  // The New York Times (PAID)
+      // === Google News proxies — skipped (we query Google News dynamically) ===
+    ),
     scrapeTargets: [],
   },
   {
     name: 'BeOne',
-    // Per Project-wise sheet → BeOne (Cancer, Drug + brand keywords)
     keywords: [
-      'BeOne', 'BeiGene',
-      'Brukinsa', 'Zanubrutinib',
-      'Tevimbra', 'Tislelizumab',
-      'Cancer', 'Drug',
+      'BeOne',
+      'BeiGene',
+      'Brukinsa',
+      'Zanubrutinib',
+      'Tevimbra',
+      'Tislelizumab',
+      'Cancer',
+      'Drug',
     ],
-    rssFeeds: [
-      ...generalHealthFeeds,
-    ],
+    rssFeeds: feeds(
+      'asco_post',  // The ASCO Post
+      'oncozine',  // Onco'Zine
+      'cll_society',  // CLL Society
+      'medcity_news',  // MedCity News
+      'medscape',  // Medscape
+      'forbes',  // Forbes
+      'fortune',  // Fortune
+      'fast_company',  // Fast Company
+      // === PAID — uncomment after obtaining subscription. See docs/subscriptions.md ===
+      // 'biocentury',  // BioCentury (PAID)
+      // 'bioworld',  // BioWorld (PAID)
+      // 'bloomberg',  // Bloomberg (PAID)
+      // 'financial_times',  // Financial Times (PAID)
+      // 'firstword_pharma',  // FirstWord Pharma (PAID)
+      // 'endpoints_news',  // Endpoints News (PAID)
+      // 'stat_news',  // STAT News (PAID)
+      // 'the_economist',  // The Economist (PAID)
+      // 'the_pharma_letter',  // The Pharma Letter (PAID)
+      // 'seeking_alpha',  // Seeking Alpha (PAID)
+      // === Google News proxies — skipped (we query Google News dynamically) ===
+    ),
     scrapeTargets: ['fiercepharma.com', 'endpts.com'],
   },
   {
     name: 'Amgen',
-    // Per Project-wise sheet → Amgen (focused on Tepezza/Krystexxa franchise)
     keywords: [
       'Amgen',
-      // Gout / TED franchise
-      'Gout', 'Thyroid eye', 'Sjögren', 'Sjogren',
-      'Tepezza', 'Krystexxa', 'pegloticase', 'Teprotumumab',
+      'Gout',
+      'Thyroid eye',
+      'Sjögren',
+      'Sjogren',
+      'Tepezza',
+      'Krystexxa',
+      'pegloticase',
+      'Teprotumumab',
     ],
-    rssFeeds: [
-      ...generalHealthFeeds,
-    ],
+    rssFeeds: feeds(
+      'abc_news',  // ABC News
+      'cbs_news',  // CBS News
+      'nbc_news',  // NBC News
+      'cnn',  // CNN
+      'cnbc',  // CNBC
+      'npr',  // NPR
+      'the_hill',  // The Hill
+      'two_minute_medicine',  // 2 Minute Medicine
+      'benzinga',  // Benzinga
+      'genetic_engineering_news',  // Genetic Engineering & Biotechnology News
+      'healthcare_dive',  // Healthcare Dive
+      'healthline',  // Healthline
+      'liver_disease_news',  // Liver Disease News
+      'medcity_news',  // MedCity News
+      'medical_daily',  // Medical Daily
+      'medical_xpress',  // Medical Xpress
+      'medpage_today',  // MedPage Today
+      'medscape',  // Medscape
+      'pharmaceutical_technology',  // Pharmaceutical Technology
+      'forbes',  // Forbes
+      // === PAID — uncomment after obtaining subscription. See docs/subscriptions.md ===
+      // 'bloomberg',  // Bloomberg (PAID)
+      // 'bloomberg_law',  // Bloomberg Law (PAID)
+      // 'financial_times',  // Financial Times (PAID)
+      // 'new_york_times',  // The New York Times (PAID)
+      // 'washington_post',  // The Washington Post (PAID)
+      // 'pink_sheet',  // Pink Sheet (PAID)
+      // 'scrip',  // Scrip (PAID)
+      // 'seeking_alpha',  // Seeking Alpha (PAID)
+      // 'endpoints_news',  // Endpoints News (PAID)
+      // 'medwatch',  // MedWatch (PAID)
+      // === Google News proxies — skipped (we query Google News dynamically) ===
+    ),
     scrapeTargets: ['fiercepharma.com', 'endpts.com', 'statnews.com'],
   },
   {
     name: 'Otsuka',
-    // Per Project-wise sheet → Otsuka
     keywords: [
-      'Otsuka', 'Rexulti', 'brexpiprazole',
-      'drug pricing', 'drug prices', 'drug price',
-      'drug cost', 'drug costs',
+      'Otsuka',
+      'Rexulti',
+      'brexpiprazole',
+      'drug pricing',
+      'drug prices',
+      'drug price',
+      'drug cost',
+      'drug costs',
       'price negotiation',
-      'most-favored nation', 'most favored nation', 'most-favored-nation',
-      'TrumpRx', '340B',
+      'most-favored nation',
+      'most favored nation',
+      'most-favored-nation',
+      'TrumpRx',
+      '340B',
     ],
-    rssFeeds: [
-      ...generalHealthFeeds,
-    ],
+    rssFeeds: feeds(
+      'abc_news',  // ABC News
+      'cbs_news',  // CBS News
+      'nbc_news',  // NBC News
+      'cnn',  // CNN
+      'cnbc',  // CNBC
+      'npr',  // NPR
+      'fox_news',  // FOX News
+      'the_hill',  // The Hill
+      'business_insider',  // Business Insider
+      'drug_discovery_world',  // Drug Discovery World
+      'fortune',  // Fortune
+      'globe_newswire',  // GlobeNewswire
+      'jama_network',  // JAMA Network
+      'medcity_news',  // MedCity News
+      'newsweek',  // Newsweek
+      'news_nation',  // News Nation
+      'pharmaceutical_technology',  // Pharmaceutical Technology
+      'politico',  // POLITICO
+      'pr_newswire',  // PR Newswire
+      'the_blaze',  // The Blaze
+      'the_daily_wire',  // The Daily Wire
+      'the_guardian',  // The Guardian
+      'washington_examiner',  // Washington Examiner
+      'forbes',  // Forbes
+      // === PAID — uncomment after obtaining subscription. See docs/subscriptions.md ===
+      // 'bloomberg',  // Bloomberg (PAID)
+      // 'bloomberg_law',  // Bloomberg Law (PAID)
+      // 'endpoints_news',  // Endpoints News (PAID)
+      // 'financial_times',  // Financial Times (PAID)
+      // 'inside_health_policy',  // Inside Health Policy (PAID)
+      // 'medwatch',  // MedWatch (PAID)
+      // 'new_york_times',  // The New York Times (PAID)
+      // 'scrip',  // Scrip (PAID)
+      // 'stat_news',  // STAT News (PAID)
+      // 'the_pharma_letter',  // The Pharma Letter (PAID)
+      // 'wall_street_journal',  // Wall Street Journal (PAID)
+      // 'washington_post',  // The Washington Post (PAID)
+      // === Google News proxies — skipped (we query Google News dynamically) ===
+    ),
     scrapeTargets: ['fiercepharma.com', 'statnews.com'],
   },
   {
     name: 'Indivior',
-    // Per Project-wise sheet → Indivior (provider-fraud / enforcement watch)
     keywords: [
-      'Indivior', 'Sublocade', 'Suboxone',
-      'buprenorphine', 'naloxone',
-      'opioid use disorder', 'OUD', 'addiction treatment',
-      // Provider categories from the sheet (these are the actual "Keywords" column)
-      'Doctor', 'Nurse', 'Pharmacist', 'Physician',
-      'Psychiatrist', 'Practitioner', 'anesthesiologist', 'surgeon',
+      'Indivior',
+      'Sublocade',
+      'Suboxone',
+      'buprenorphine',
+      'naloxone',
+      'opioid use disorder',
+      'OUD',
+      'addiction treatment',
+      'Doctor',
+      'Nurse',
+      'Pharmacist',
+      'Physician',
+      'Psychiatrist',
+      'Practitioner',
+      'anesthesiologist',
+      'surgeon',
     ],
-    rssFeeds: [
-      ...generalHealthFeeds,
-    ],
+    rssFeeds: feeds(
+      'medcity_news',  // MedCity News
+      'medpage_today',  // MedPage Today
+      'medscape',  // Medscape
+      'medical_xpress',  // Medical Xpress
+      'healthline',  // Healthline
+      'medical_daily',  // Medical Daily
+      'politico',  // POLITICO
+      'npr',  // NPR
+      'the_hill',  // The Hill
+      // === Google News proxies — skipped (we query Google News dynamically) ===
+    ),
     scrapeTargets: ['statnews.com', 'fiercepharma.com'],
   },
 ];
 
 // In-memory mutable store so PATCH /api/companies can update keywords at runtime.
-// Resets on cold start — for permanent edits, change this file.
 const mutableCompanies: Company[] = COMPANIES.map((c) => ({ ...c, keywords: [...c.keywords] }));
 
 export function getCompanies(): Company[] {
