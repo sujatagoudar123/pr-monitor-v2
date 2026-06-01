@@ -12,7 +12,7 @@
     { "path": "/api/cron-send?slot=slot-0500-utc", "schedule": "40 4 * * *" },
     { "path": "/api/cron-send?slot=slot-0530-utc", "schedule": "10 5 * * *" },
     { "path": "/api/cron-send?slot=slot-0600-utc", "schedule": "40 5 * * *" },
-    { "path": "/api/cron-send?slot=slot-1000-utc", "schedule": "40 9 * * *" },
+    { "path": "/api/cron-send?slot=slot-1000-utc", "schedule": "40 14 * * *" },
     { "path": "/api/cron-send?slot=slot-1100-utc", "schedule": "40 10 * * *" },
     { "path": "/api/cron-send?slot=slot-1130-utc", "schedule": "10 11 * * *" },
     { "path": "/api/cron-send?slot=slot-1200-utc", "schedule": "40 11 * * *" },
