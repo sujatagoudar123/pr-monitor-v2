@@ -206,7 +206,7 @@ export default function Page() {
           <p className="serif text-lg text-muted mt-4 max-w-2xl leading-relaxed">
             Claude reasons step-by-step across your RSS feeds, Google News, NewsAPI, Bing News, and HTML scraping —
             picks the relevant articles, explains why each one was chosen, and writes an executive summary.
-            Only articles from the last <span className="text-navy font-semibold">72 hours</span> are shown.
+            Only articles from the last <span className="text-navy font-semibold">{result?.stats?.lookbackHours ?? 72} hours</span> are shown.
           </p>
         </header>
 
@@ -347,7 +347,7 @@ export default function Page() {
             {/* Articles */}
             {result.articles.length === 0 && (
               <div className="bg-white border border-border rounded-md p-8 text-center">
-                <p className="serif text-lg text-navy">No significant news in the last 72 hours.</p>
+                <p className="serif text-lg text-navy">No significant news in the last {result.stats?.lookbackHours ?? 72} hours.</p>
                 <p className="text-muted text-sm mt-2">Try expanding keywords or widening the FRESHNESS_HOURS env var.</p>
               </div>
             )}
@@ -477,7 +477,7 @@ export default function Page() {
         )}
 
         <footer className="mt-16 pt-8 border-t border-border text-center text-xs text-muted">
-          PR Monitor Agent · Powered by Claude · RSS + Google News + NewsAPI + Bing News + Scraping · AWS SES email · 72h freshness window
+          PR Monitor Agent · Powered by Claude · RSS + Google News + NewsAPI + Bing News + Scraping · AWS SES email · {result?.stats?.lookbackHours ?? 72}h freshness window
         </footer>
       </main>
     </div>
