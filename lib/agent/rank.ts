@@ -43,6 +43,33 @@ function isCompanySpecific(keyword: string): boolean {
   return !GENERIC_INDUSTRY_TERMS.has(keyword.toLowerCase().trim());
 }
 
+/**
+ * News-context signal words. If a generic-only article has these, it likely
+ * describes a real news event (outbreak, approval, regulation, drive) rather
+ * than a generic explainer/wellness article.
+ */
+const NEWS_CONTEXT_WORDS = [
+  // Events
+  'outbreak', 'surge', 'spike', 'epidemic', 'pandemic', 'cluster',
+  'cases', 'deaths', 'hospitalized', 'hospitalised',
+  // Regulatory/clinical
+  'approves', 'approved', 'approval', 'fda', 'ema', 'mhra', 'cdc', 'who',
+  'guidelines', 'recommendation', 'label', 'recall', 'warning',
+  // Commercial / market
+  'launch', 'launches', 'launched', 'rollout', 'roll-out', 'shortage',
+  'reimbursement', 'price', 'pricing', 'coverage',
+  // Public-health programs
+  'campaign', 'drive', 'program', 'programme', 'offered', 'vaccinate',
+  'vaccination', 'jab', 'jabs',
+  // Reports / data
+  'report', 'study', 'trial', 'data', 'results', 'findings', 'announces',
+];
+
+function hasNewsContext(article: Article): boolean {
+  const hay = `${article.title} ${article.snippet ?? ''}`.toLowerCase();
+  return NEWS_CONTEXT_WORDS.some((w) => hay.includes(w));
+}
+
 function regexFallback(article: Article, keywords: string[], companyName: string): {
   relevance: number; matched: string[]; why: string;
 } {
@@ -51,17 +78,31 @@ function regexFallback(article: Article, keywords: string[], companyName: string
   if (matched.length === 0) {
     return { relevance: 0, matched: [], why: 'No direct keyword matches found.' };
   }
-  // Distinguish company-specific matches from generic ones
   const specific = matched.filter(isCompanySpecific);
   const namedMention = hay.includes(companyName.toLowerCase()) || specific.length > 0;
-  // Generic-only matches stay below the 0.4 cutoff so they get dropped
-  const relevance = namedMention
-    ? Math.min(0.6 + 0.1 * specific.length, 0.9)
-    : 0.3;
-  const why = namedMention
-    ? `Matched company-specific terms: ${specific.slice(0, 4).join(', ') || matched.slice(0, 2).join(', ')}.`
-    : `Only matched generic industry terms (${matched.slice(0, 3).join(', ')}); no direct company/product mention.`;
-  return { relevance, matched, why };
+
+  if (namedMention) {
+    // Strong match: company or product/person mentioned
+    return {
+      relevance: Math.min(0.6 + 0.1 * specific.length, 0.9),
+      matched,
+      why: `Matched company-specific terms: ${specific.slice(0, 4).join(', ') || matched.slice(0, 2).join(', ')}.`,
+    };
+  }
+
+  // Generic-only — distinguish news event from generic explainer
+  if (hasNewsContext(article)) {
+    return {
+      relevance: 0.5,
+      matched,
+      why: `News in ${companyName}'s category (${matched.slice(0, 2).join(', ')}) — outbreak, approval, or market event.`,
+    };
+  }
+  return {
+    relevance: 0.3,
+    matched,
+    why: `Only matched generic terms (${matched.slice(0, 3).join(', ')}) in a non-news context.`,
+  };
 }
 
 interface RankResult {
@@ -101,11 +142,23 @@ ${genericKeywords.map((k) => `  - ${k}`).join('\n') || '  (none)'}
 SCORING RULES (follow these strictly):
 - 1.0 = directly about ${company}'s business, products, leadership, regulatory actions, or material news. Company name or a company-specific keyword appears prominently in the title or first sentence.
 - 0.7–0.9 = clearly about ${company} or one of its products/brands/people, even if other topics are also discussed.
-- 0.5–0.6 = mentions ${company} or a company-specific keyword somewhere in the article, but the article is primarily about something else.
-- 0.3 = matches only GENERIC industry terms (e.g. "HVAC", "drug pricing", "vaccine") WITHOUT naming ${company} or a company-specific keyword. DROP THESE.
+- 0.5–0.6 = (a) mentions ${company} or a company-specific keyword somewhere in the article, but the article is primarily about something else, OR (b) the article is real news directly about a disease/franchise/category from the GENERIC list (e.g. a meningitis outbreak, a vaccination drive, an RSV regulatory action) — i.e. it's news that materially affects ${company}'s market even if the company isn't named.
+- 0.3 = the GENERIC term appears but only in a general explainer / wellness / "what is X" / "how to prevent" context — no real news event, no policy action, no outbreak. DROP THESE.
 - 0.0 = unrelated.
 
-CRITICAL RULE: If the article does NOT mention "${company}" (or a close variant like "${company}'s") AND does NOT mention any of the COMPANY-SPECIFIC keywords above, the score MUST be ≤ 0.3.
+KEY DISTINCTION for borderline cases (no company-specific keyword present):
+  KEEP (score 0.5–0.6):
+    - "Meningitis outbreak at university, vaccines offered to students"
+    - "FDA approves first RSV vaccine for infants"
+    - "CDC reports surge in shingles cases among adults"
+    - "Drug pricing legislation passes Senate" (for companies with policy keywords)
+  DROP (score 0.3):
+    - "What is meningitis? Symptoms and treatment"
+    - "How to protect yourself from contagious viruses"
+    - "10 things to know about getting older with shingles"
+    - "Wellness tips for cold and flu season"
+
+The signal for KEEP is an event, action, or development. The signal for DROP is a general educational/wellness/listicle piece.
 
 For each article, list which keywords/topics actually appear, and write ONE short sentence explaining the score.
 
