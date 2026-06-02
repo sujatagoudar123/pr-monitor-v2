@@ -73,6 +73,7 @@ export const COMPANIES: Company[] = [
     rssFeeds: feeds(
       'bbc',  // BBC
       'bbc_health',  // BBC Health
+      'bbc_england',  // BBC England regional (catches local meningitis outbreaks, vax drives)
       'channel_4_news',  // Channel 4 News
       'sky_news',  // Sky News
       'the_guardian',  // The Guardian
