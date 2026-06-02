@@ -17,8 +17,8 @@ import { searchNewsApi, newsApiAvailable } from '@/lib/sources/newsapi';
 import { searchBingNews, bingNewsAvailable } from '@/lib/sources/bing-news';
 import { scrapePublications } from '@/lib/sources/scrape';
 
-const MAX_ITERATIONS = 12;
-const MAX_TOOL_CALLS = 10;
+const MAX_ITERATIONS = 14;
+const MAX_TOOL_CALLS = 14;
 const REQUIRED_SOURCES: SourceType[] = ['rss', 'google_news', 'scrape'];
 
 const TOOLS: Anthropic.Tool[] = [
@@ -127,7 +127,7 @@ export async function runAgentLoop(
     `COMPANY-SPECIFIC KEYWORDS (use these as extra_terms — each unambiguously refers to ${company.name}):\n` +
     `${specificKeywords.map((k) => `  - ${k}`).join('\n')}\n\n` +
     (genericKeywords.length
-      ? `GENERIC INDUSTRY TERMS (do NOT use these as extra_terms — they produce too much noise. Articles matching only these will be dropped at ranking):\n${genericKeywords.map((k) => `  - ${k}`).join('\n')}\n\n`
+      ? `CATEGORY/DISEASE TERMS (these alone are too broad, but combining them with a news-context word like "outbreak", "approval", "vaccine drive", "FDA", "CDC", "recall" gives you news in ${company.name}'s market that may not name the company directly — VERY IMPORTANT to find these articles):\n${genericKeywords.map((k) => `  - ${k}`).join('\n')}\n\n`
       : '') +
     `Available sources at runtime:\n` +
     `  - search_rss_feeds        (always — REQUIRED)\n` +
@@ -135,16 +135,17 @@ export async function runAgentLoop(
     `  - search_newsapi          (${newsApiAvailable() ? 'available' : 'NO KEY — do not call'})\n` +
     `  - search_bing_news        (${bingNewsAvailable() ? 'available' : 'NO KEY — do not call'})\n` +
     `  - scrape_publications     (always — REQUIRED)\n\n` +
-    `RULES:\n` +
-    `1. All sources already filter to the last 72 hours at the source. Gather widely; freshness is handled for you.\n` +
-    `2. You MUST call search_rss_feeds, search_google_news, AND scrape_publications at least once before you are allowed to call finalize.\n` +
-    `3. Iter 0: search just the company name. Iter 1+: use 3-5 of the COMPANY-SPECIFIC keywords above as extra_terms to broaden coverage. Cycle through different keyword subsets across iterations so all product/brand/person names get queried.\n` +
-    `4. NEVER use generic industry terms as extra_terms — they return too much off-topic noise.\n` +
-    `5. Hard cap: ${MAX_TOOL_CALLS} tool calls total.\n` +
-    `6. After all required sources have been called, evaluate breadth and call finalize when you have meaningful coverage (typically 50+ raw articles across sources).`;
+    `SEARCH STRATEGY (be thorough — you have ${MAX_TOOL_CALLS} tool calls):\n` +
+    `1. Iter 0: company name only (e.g. "${company.name}"). Calls RSS + Google News + scrape in parallel.\n` +
+    `2. Iter 1: pick 3-5 COMPANY-SPECIFIC keywords (products, people, brands) as extra_terms.\n` +
+    `3. Iter 2: pick 3-5 DIFFERENT company-specific keywords (cycle through them so all get covered).\n` +
+    `4. Iter 3+: for CATEGORY/DISEASE terms above, use Google News with the term PAIRED with a news-context word, e.g. extra_terms=["meningitis outbreak", "RSV approval", "shingles vaccine drive"]. Do NOT pass them alone.\n` +
+    `5. You MUST call search_rss_feeds, search_google_news, AND scrape_publications at least once before finalizing.\n` +
+    `6. Aim for 100+ raw articles across all sources before finalizing.\n` +
+    `7. Hard cap: ${MAX_TOOL_CALLS} tool calls total.`;
 
   const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: `Research "${company.name}" for today's brief. Use ALL required tools (rss, google_news, scrape), use COMPANY-SPECIFIC keywords as extra_terms, then finalize.` },
+    { role: 'user', content: `Research "${company.name}" for today's brief. Use ALL required tools, cycle through company-specific keywords, AND search for category/disease terms paired with news-context words (outbreak, approval, drive, FDA, CDC) to catch market news that doesn't name the company. Then finalize.` },
   ];
 
   for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
