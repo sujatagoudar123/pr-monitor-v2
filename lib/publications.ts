@@ -75,6 +75,12 @@ export const PUBLICATIONS = {
     rss: 'https://feeds.bbci.co.uk/news/health/rss.xml',
     status: 'active',
   },
+  'bbc_england': {
+    display_name: 'BBC England (regional health stories)',
+    rss: 'https://feeds.bbci.co.uk/news/england/rss.xml',
+    status: 'active',
+    notes: 'Catches UK regional health stories like local outbreaks, vaccination drives, etc.',
+  },
   'benzinga': {
     display_name: 'Benzinga',
     rss: 'https://www.benzinga.com/feed',
