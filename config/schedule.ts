@@ -44,21 +44,25 @@ export interface ScheduleSlot {
 }
 
 export const SCHEDULE: ScheduleSlot[] = [
-  // First sends of the day — 72h window to catch overnight news
-  { id: 'slot-0500-utc', label: '10:30 AM IST — GSK Send 1', istTime: '10:30 IST', companies: ['GSK'], lookbackHours: 72 },
-  { id: 'slot-0530-utc', label: '11:00 AM IST — Send 1', istTime: '11:00 IST', companies: ['BeOne', 'Otsuka'], lookbackHours: 72 },
-  { id: 'slot-0600-utc', label: '11:30 AM IST — Send 1', istTime: '11:30 IST', companies: ['Mazda', 'Trane', 'Amgen'], lookbackHours: 72 },
+  // Every slot uses FRESHNESS_HOURS env var (currently 24h).
+  // The "already-sent" Blob tracker handles duplicate prevention across sends.
+  // If you ever want a slot to override globally, add `lookbackHours: N`.
 
-  // Second sends — 6h window to only catch what's new since send 1
-  { id: 'slot-1000-utc', label: '03:30 PM IST — GSK Send 2', istTime: '15:30 IST', companies: ['GSK'], lookbackHours: 6 },
-  { id: 'slot-1100-utc', label: '04:30 PM IST — Otsuka Send 2', istTime: '16:30 IST', companies: ['Otsuka'], lookbackHours: 6 },
-  { id: 'slot-1130-utc', label: '05:00 PM IST — BeOne Send 2', istTime: '17:00 IST', companies: ['BeOne'], lookbackHours: 7 },
+  // First sends of the day
+  { id: 'slot-0500-utc', label: '10:30 AM IST — GSK Send 1', istTime: '10:30 IST', companies: ['GSK'] },
+  { id: 'slot-0530-utc', label: '11:00 AM IST — Send 1', istTime: '11:00 IST', companies: ['BeOne', 'Otsuka'] },
+  { id: 'slot-0600-utc', label: '11:30 AM IST — Send 1', istTime: '11:30 IST', companies: ['Mazda', 'Trane', 'Amgen'] },
 
-  // Third sends / second sends for some companies — 6h window
-  { id: 'slot-1200-utc', label: '05:30 PM IST — Send 2/3', istTime: '17:30 IST', companies: ['GSK', 'Mazda', 'Trane', 'Amgen'], lookbackHours: 6 },
+  // Second sends
+  { id: 'slot-1000-utc', label: '03:30 PM IST — GSK Send 2', istTime: '15:30 IST', companies: ['GSK'] },
+  { id: 'slot-1100-utc', label: '04:30 PM IST — Otsuka Send 2', istTime: '16:30 IST', companies: ['Otsuka'] },
+  { id: 'slot-1130-utc', label: '05:00 PM IST — BeOne Send 2', istTime: '17:00 IST', companies: ['BeOne'] },
 
-  // Late day Indivior send 1 — 72h since this is the only send of the day
-  { id: 'slot-1400-utc', label: '07:30 PM IST — Indivior Send 1', istTime: '19:30 IST', companies: ['Indivior'], lookbackHours: 72 },
+  // Third sends / multi-company Send 2/3
+  { id: 'slot-1200-utc', label: '05:30 PM IST — Send 2/3', istTime: '17:30 IST', companies: ['GSK', 'Mazda', 'Trane', 'Amgen'] },
+
+  // Late day Indivior send
+  { id: 'slot-1400-utc', label: '07:30 PM IST — Indivior Send 1', istTime: '19:30 IST', companies: ['Indivior'] },
 ];
 
 export function getSlot(id: string | null | undefined): ScheduleSlot | undefined {
