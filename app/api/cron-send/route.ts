@@ -165,11 +165,15 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      const stats = (agent.stats as Record<string, unknown> | undefined) ?? {};
       perCompany.push({
         company,
         status: emailRes.ok ? 'sent' : 'email_failed',
         articleCount: articles.length,
-        alreadySeenSkipped: (agent.stats as Record<string, unknown> | undefined)?.alreadySeenSkipped ?? 0,
+        alreadySeenSkipped: stats.alreadySeenSkipped ?? 0,
+        droppedByDomain: stats.droppedByDomain ?? 0,
+        droppedByStockPattern: stats.droppedByStockPattern ?? 0,
+        droppedByNonUS: stats.droppedByNonUS ?? 0,
         isEmpty,
         recipients: { to, cc },
         emailStatus: emailRes.status,
