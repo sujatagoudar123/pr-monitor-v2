@@ -30,6 +30,7 @@ import { dedupeArticles } from '@/lib/agent/dedupe';
 import { rankArticles, writeExecutiveSummary } from '@/lib/agent/rank';
 import { applyFreshness, getLookbackHours } from '@/lib/freshness';
 import { filterUnseen } from '@/lib/seen';
+import { applySourceFilters } from '@/lib/filters';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -84,7 +85,14 @@ export async function POST(req: NextRequest) {
     const freshness = applyFreshness(deduped, lookbackHours);
     let fresh = freshness.kept;
 
-    // 4) Seen-items filter (BEFORE ranking, saves LLM tokens).
+    // 4) Source filters — drop blocked domains (financial aggregators),
+    //    stock/market-news titles, and non-US publications (with per-company
+    //    UK exceptions for GSK and Otsuka). Runs BEFORE the LLM ranker so
+    //    we don't waste tokens scoring articles we're going to drop.
+    const filtered = applySourceFilters(fresh, company.name);
+    fresh = filtered.kept;
+
+    // 5) Seen-items filter (also BEFORE ranking).
     //    Only when caller asks (cron route). Manual UI searches show everything.
     let alreadySeenSkipped = 0;
     if (excludeSeen) {
@@ -93,10 +101,10 @@ export async function POST(req: NextRequest) {
       alreadySeenSkipped = seenResult.skipped;
     }
 
-    // 5) Rank what remains
+    // 6) Rank what remains
     const ranked = await rankArticles(client, model, company.name, company.keywords, fresh);
 
-    // 6) Summary
+    // 7) Summary
     const executiveSummary = await writeExecutiveSummary(client, model, company.name, ranked);
 
     return NextResponse.json({
@@ -111,6 +119,10 @@ export async function POST(req: NextRequest) {
         afterFreshness: freshness.kept.length,
         droppedAsStale: freshness.stats.dropped,
         undated: freshness.stats.undated,
+        droppedByDomain: filtered.droppedByDomain,
+        droppedByStockPattern: filtered.droppedByStockPattern,
+        droppedByNonUS: filtered.droppedByNonUS,
+        afterSourceFilters: filtered.kept.length,
         excludeSeen,
         alreadySeenSkipped,
         afterSeenFilter: fresh.length,
