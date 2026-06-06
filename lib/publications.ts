@@ -84,7 +84,13 @@ export const PUBLICATIONS = {
   'benzinga': {
     display_name: 'Benzinga',
     rss: 'https://www.benzinga.com/feed',
+    status: 'paid',  // STATUS: deactivated — analysts don't want stock-news outlets (filtered out anyway)
+  },
+  'business_wire': {
+    display_name: 'Business Wire',
+    rss: 'https://feed.businesswire.com/rss/home/?rss=G1QFDERJXkJfWFlSWg==',
     status: 'active',
+    notes: 'Sridevi (Otsuka) requested. Press-release wire — useful for corporate announcements.',
   },
   'biocentury': {
     display_name: 'BioCentury',
