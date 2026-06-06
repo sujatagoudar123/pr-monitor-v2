@@ -26,17 +26,27 @@ const MIN_RELEVANCE = 0.4;
  * the company itself.
  */
 const GENERIC_INDUSTRY_TERMS = new Set([
-  // Pharma generic
+  // Pharma generic (GSK)
   'pharmaceutical', 'biotech', 'pharma', 'vaccine', 'vaccines',
-  'drug', 'drugs', 'cancer', 'oncology', 'flu', 'influenza',
   'respiratory', 'meningitis', 'shingles',
+  'flu', 'influenza',
+  // Generic drug/cancer (BeOne)
+  'cancer', 'drug', 'drugs', 'oncology',
+  // Amgen disease franchises
+  'gout', 'thyroid eye', 'thyroid eye disease', 'ted',
+  "sjögren", "sjogren", "sjögren's", "sjogren's",
   // HVAC generic
   'hvac', 'refrigeration', 'sustainability', 'cooling',
-  // Healthcare worker categories (Indivior uses these but they're generic)
+  // Indivior healthcare-worker categories + indication
   'doctor', 'nurse', 'pharmacist', 'physician', 'psychiatrist',
   'practitioner', 'anesthesiologist', 'surgeon',
-  // Drug-pricing policy generic
+  'opioid use disorder', 'oud', 'addiction treatment',
+  // Otsuka drug-pricing policy
   'drug price', 'drug prices', 'drug pricing', 'drug cost', 'drug costs',
+  'price negotiation',
+  'most favored nation', 'most-favored nation', 'most-favored-nation', 'mfn',
+  '340b',
+  'psychedelic', 'psychedelics',
 ]);
 
 function isCompanySpecific(keyword: string): boolean {
