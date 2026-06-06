@@ -35,23 +35,44 @@ const BLOCKED_DOMAINS = new Set([
   'marketbeat.com',
   'finimize.com',
   'barchart.com',
-  // Yahoo Finance has SOME real PR news, but per Tonoy's BeOne feedback,
-  // analysts don't want it. Block sitewide.
+  // Yahoo Finance — analysts said "we need the relevant outlet" not Yahoo
   'finance.yahoo.com',
   // Other share-volume / portfolio-tracker sites that surfaced as noise
   'seekingalpha.com',
   'fool.com',
-  'benzinga.com', // listed in Mazda doc as feed source but only carries stock content for our companies
   'zacks.com',
   'stocktitan.net',
   'stocknewsapi.com',
   'wallstreetzen.com',
   'streetinsider.com',
-  'wsj.com', // Note: WSJ does great PR coverage; analysts kept it in feedback
+  // Additional sites flagged in BeOne June 2-3 feedback (Tonoy)
+  'adhocnews.com',
+  'ad-hoc-news.com',
+  'ad-hoc-news.de',
+  'financialcontent.com',
+  'blockonomi.com',
+  'pharmiweb.com',  // analyst noted couldn't access
+  // Asian / regional stock-aggregator sites
+  'futubull.com',
+  'futunn.com',
+  'eu.36kr.com',
+  '36kr.com',
+  // Additional sites flagged in Trane June 2-4 feedback (Tonoy)
+  'bitget.com',
+  'pluang.com',
+  'tradersunion.com',
+  'alphastreet.com',
+  'quiverquant.com',
+  'marketwatch.com',  // analyst flagged stock-only posts repeatedly
+  'openpr.com',
+  'stocktradersdaily.com',
+  'stockstory.org',
+  'trefis.com',
+  'stocktwits.com',
+  // PR press-release aggregator sites that re-syndicate without adding value
+  'einpresswire.com',
+  'prleap.com',
 ]);
-
-// Re-allow WSJ per Sam's GSK feedback (subscription-only but headlines OK)
-BLOCKED_DOMAINS.delete('wsj.com');
 
 function getDomain(url: string): string {
   try {
@@ -106,6 +127,23 @@ const STOCK_TITLE_PATTERNS: RegExp[] = [
   /\bADR\s+(treads|trades|hovers|holds|edges|rises|falls)/i,
   // Earnings-as-stock-event (only when title is dominantly about price reaction)
   /\b(outperforms?|underperforms?)\b.{0,40}(market|sector|competitors|peers|healthcare|industry)/i,
+  // Stock movement headlines from BeOne/Trane June feedback
+  /\b(after|on|amid)\s+\d+(\.\d+)?%\s+(rally|gain|drop|fall|jump|slide|rise|surge)\b/i,
+  /\bsliding\s+today\b/i,
+  /\bGF\s+Value\b/i,  // GuruFocus signature phrase
+  /\b(reduces?|trims?|cuts?|boosts?|increases?|raises?)\s+(its\s+)?(stake|holdings|position)\b/i,
+  /\bshares?\s+(sold|purchased|bought)\s+by\b/i,
+  /\bis\s+rated\s+(buy|sell|hold|neutral|outperform|underperform|overweight|underweight)\b/i,
+  /\bblock\s+trade\s+of\b/i,
+  /\b(bearish|bullish)\s+block\s+trade\b/i,
+  /\b(rocks?|rocked)\s+by\s+(insider|fresh)\s+(stock|share)\s+sale\b/i,
+  /\binsider\s+stock\s+sale\b/i,
+  /\bRSU\s+tax\s+withholding\b/i,
+  /\bSEC\s+filing\b/i,
+  /\bnew\s+52[-\s]?week\s+low\b/i,
+  /\bnew\s+52[-\s]?week\s+high\b/i,
+  /\bvoting\s+rights\s+(update|announcement)\b/i,
+  /\bcooling\s+equipment\s+market\b.*(forecast|companies|opportunities)/i,
 ];
 
 function isStockNewsTitle(title: string): boolean {
@@ -125,22 +163,28 @@ const NON_US_DOMAINS = new Set([
   'driving.ca', 'autohebdo.net', 'auto123.com', 'lapresse.ca',
   'thecanadianpressnews.ca', 'tolerance.ca', 'cbc.ca', 'theglobeandmail.com',
   'nationalpost.com', 'emptytank.ca', 'motorillustrated.com',
-  // UK (Sam's feedback: keep for GSK, drop for everyone else)
+  // UK
   'bbc.co.uk', 'bbc.com', 'feeds.bbci.co.uk', 'theguardian.com', 'guardian.co.uk',
   'channel4.com', 'skynews.com', 'sky.com', 'standard.co.uk', 'thisismoney.co.uk',
   'dailymail.co.uk', 'mirror.co.uk', 'express.co.uk', 'thesun.co.uk',
   'metro.co.uk', 'thetimes.co.uk', 'telegraph.co.uk', 'independent.co.uk',
   'ft.com', 'economist.com', 'cityam.com', 'completecar.ie',
+  'buildersmerchantsjournal.net',  // UK trade journal — Trane analyst approved
   // Australia / NZ / Asia / EU / LATAM
   'canberratimes.com.au', 'standard.net.au', 'baypost.com.au', 'theaustralian.com.au',
-  'reuters.com', // Reuters is global wire — gets mixed coverage but analysts didn't flag, keep
   'nikkei.com', 'asia.nikkei.com', 'scmp.com', 'japantimes.co.jp',
   'koreaherald.com', 'business-standard.com', 'livemint.com', 'tukoo.co.ke',
   'investing.com.ng',
+  'afaqs.com',
+  'asatunews.co.id',
+  'mabumbe.com',
+  'finansavisen.no',  // Norway — Trane analyst approved (JCI coverage)
+  'automotive-world.com',  // Mazda — flagged as non-US in feedback
+  'portalcnj.com.br',  // Mazda — Brazilian portal (Portuguese)
+  'sg.investing.com', 'investing.com.in',
   // Stock aggregators with regional editions
   'in.investing.com', 'investing.com.nigeria',
 ]);
-NON_US_DOMAINS.delete('reuters.com'); // keep Reuters globally
 
 /**
  * Per-company exception list: domains that are technically non-US but the
@@ -153,14 +197,23 @@ const COMPANY_UK_ALLOWLIST: Record<string, Set<string>> = {
     'theguardian.com', 'channel4.com', 'skynews.com', 'sky.com',
     'standard.co.uk', 'thisismoney.co.uk', 'dailymail.co.uk',
     'mirror.co.uk', 'express.co.uk', 'metro.co.uk', 'independent.co.uk',
-    'ft.com', // headlines via Google News
+    'ft.com',
   ]),
   // Sridevi's Otsuka feedback: BBC, Guardian, Pharmaceutical Technology, Pharma Letter OK
   Otsuka: new Set([
     'bbc.co.uk', 'bbc.com', 'feeds.bbci.co.uk',
     'theguardian.com', 'pharmaceutical-technology.com', 'thepharmaletter.com',
   ]),
-  // All other companies: no UK allowlist — strict US-only
+  // Tonoy's Trane feedback: HVAC trade journals approved
+  Trane: new Set([
+    'buildersmerchantsjournal.net',  // Daikin Sustainable Home Centre coverage
+    'finansavisen.no',  // JCI Q2 / "Going to Gemba Day" coverage
+  ]),
+  // Tonoy's BeOne feedback: Pharma Letter explicitly approved
+  BeOne: new Set([
+    'thepharmaletter.com',  // Brukinsa Ireland reimbursement coverage
+  ]),
+  // All other companies: strict US-only
 };
 
 function isNonUS(url: string, company: string): boolean {
