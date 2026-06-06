@@ -325,6 +325,8 @@ export const COMPANIES: Company[] = [
       'most-favored-nation',
       'TrumpRx',
       '340B',
+      'psychedelic',
+      'psychedelics',
     ],
     rssFeeds: feeds(
       'abc_news',  // ABC News
@@ -336,6 +338,7 @@ export const COMPANIES: Company[] = [
       'fox_news',  // FOX News
       'the_hill',  // The Hill
       'business_insider',  // Business Insider
+      'business_wire',  // Business Wire (Sridevi requested)
       'drug_discovery_world',  // Drug Discovery World
       'fortune',  // Fortune
       'globe_newswire',  // GlobeNewswire
