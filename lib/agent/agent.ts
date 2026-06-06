@@ -111,13 +111,27 @@ export async function runAgentLoop(
   // searches on company-specific terms (products/people/brands), not generic ones,
   // because generic terms produce noise.
   const GENERIC = new Set([
+    // Pharma generic (GSK)
     'pharmaceutical', 'biotech', 'pharma', 'vaccine', 'vaccines',
-    'drug', 'drugs', 'cancer', 'oncology', 'flu', 'influenza',
     'respiratory', 'meningitis', 'shingles',
+    'flu', 'influenza',
+    // Generic drug/cancer (BeOne)
+    'cancer', 'drug', 'drugs', 'oncology',
+    // Amgen disease franchises
+    'gout', 'thyroid eye', 'thyroid eye disease', 'ted',
+    "sjögren", "sjogren", "sjögren's", "sjogren's",
+    // HVAC generic (none in current Trane list but reserved)
     'hvac', 'refrigeration', 'sustainability', 'cooling',
+    // Indivior healthcare-worker categories + indication
     'doctor', 'nurse', 'pharmacist', 'physician', 'psychiatrist',
     'practitioner', 'anesthesiologist', 'surgeon',
+    'opioid use disorder', 'oud', 'addiction treatment',
+    // Otsuka drug-pricing policy
     'drug price', 'drug prices', 'drug pricing', 'drug cost', 'drug costs',
+    'price negotiation',
+    'most favored nation', 'most-favored nation', 'most-favored-nation', 'mfn',
+    '340b',
+    'psychedelic', 'psychedelics',
   ]);
   const specificKeywords = company.keywords.filter((k) => !GENERIC.has(k.toLowerCase().trim()));
   const genericKeywords = company.keywords.filter((k) => GENERIC.has(k.toLowerCase().trim()));
@@ -270,6 +284,62 @@ export async function runAgentLoop(
       });
     } catch { /* ignore */ }
   }
+
+  // -------------------------------------------------------------------------
+  // KEYWORD-COVERAGE SWEEP — runs AFTER the agent.
+  //
+  // PROBLEM (analyst oral feedback, June 2026):
+  //   "not all articles cover all keyword if otsuka then its mainly covering
+  //    otsuka n few more give keyword but not all its same for all"
+  //
+  //   i.e. the agent has discretion and picks only ~3-5 keywords. With 15-33
+  //   keywords per company, most never get searched and never reach the
+  //   ranker, so the email is dominated by company-name hits.
+  //
+  // SOLUTION: a deterministic sweep that GUARANTEES every company keyword
+  //   gets at least one Google News query.
+  //
+  //   * Each SPECIFIC keyword → searched as-is (e.g. "Shingrix", "Bexsero")
+  //   * Each CATEGORY keyword → paired with a news-context word to avoid
+  //     drowning in wellness articles (e.g. "meningitis outbreak",
+  //     "MFN approval", "drug pricing FDA")
+  //   * Batched in groups of 3 for concurrency + Google News rate limits
+  // -------------------------------------------------------------------------
+  trace.push(`[sweep] starting keyword-coverage sweep across ${company.keywords.length} keywords`);
+  const NEWS_CONTEXT_FOR_CATEGORY = ['outbreak', 'approval', 'FDA', 'CDC', 'recall', 'launch', 'data', 'study'];
+  const sweepQueries: { term: string; label: string }[] = [];
+
+  for (const kw of specificKeywords) {
+    // Don't re-search company name (already in iter 0)
+    if (kw.toLowerCase() === company.name.toLowerCase()) continue;
+    sweepQueries.push({ term: kw, label: `specific:${kw}` });
+  }
+
+  for (let i = 0; i < genericKeywords.length; i++) {
+    const kw = genericKeywords[i];
+    // Rotate through news-context words so we don't always pair with "outbreak"
+    const ctx = NEWS_CONTEXT_FOR_CATEGORY[i % NEWS_CONTEXT_FOR_CATEGORY.length];
+    sweepQueries.push({ term: `${kw} ${ctx}`, label: `category:${kw}` });
+  }
+
+  const BATCH_SIZE = 3;
+  let sweepArticleCount = 0;
+  for (let i = 0; i < sweepQueries.length; i += BATCH_SIZE) {
+    const batch = sweepQueries.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map((q) => searchGoogleNews(company.name, [q.term])),
+    );
+    results.forEach((r, idx) => {
+      if (r.status === 'fulfilled') {
+        pool.push(...r.value);
+        sweepArticleCount += r.value.length;
+        trace.push(`[sweep] ${batch[idx].label} -> +${r.value.length} (pool=${pool.length})`);
+      } else {
+        trace.push(`[sweep] ${batch[idx].label} FAILED: ${r.reason}`);
+      }
+    });
+  }
+  trace.push(`[sweep] complete — ${sweepArticleCount} articles added across ${sweepQueries.length} queries`);
 
   return {
     articles: pool,
