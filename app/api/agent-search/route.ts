@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
         droppedByDomain: filtered.droppedByDomain,
         droppedByStockPattern: filtered.droppedByStockPattern,
         droppedByNonUS: filtered.droppedByNonUS,
+        droppedByStrictAllowlist: filtered.droppedByStrictAllowlist,
         afterSourceFilters: filtered.kept.length,
         excludeSeen,
         alreadySeenSkipped,
