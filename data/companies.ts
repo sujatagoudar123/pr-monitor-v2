@@ -29,46 +29,32 @@ export const COMPANIES: Company[] = [
   {
     name: 'GSK',
     keywords: [
-      // Company / leadership
+      // Per April 28, 2026 authoritative spec sheet (exact order, exact spelling)
       'GSK',
-      'GlaxoSmithKline',
-      'Emma Walmsley',
-      // Categories
-      'pharmaceutical',
-      'biotech',
+      'Glaxosmithkline',
       'Pharma',
-      'vaccine',
-      // RSV franchise — GSK products + competitors
-      'RSV',
-      'respiratory',
-      'respiratory syncytial virus',
-      'Arexvy',
-      'Abrysvo',         // Pfizer (competitor)
-      'Clesrovimab',     // Merck (competitor)
-      'Nirsevimab',      // generic / pipeline
-      'Beyfortus',       // Sanofi / AstraZeneca (competitor)
-      // Shingles franchise
-      'shingles',
-      'Shingrix',
-      // Meningitis franchise — GSK products + competitors + campaigns
-      'meningitis',
+      'Drug price',
+      'Shingles',
+      'SHINGRIX',
+      'Meningitis',
       'Meningococcal',
       'Bexsero',
-      'Menveo',
-      'Penbraya',        // Pfizer (competitor)
-      'Ask2BSure',       // GSK awareness campaign
-      // Flu franchise
-      'Flu',
+      'RSV',
+      'respiratory syncytial virus',
+      'Arexvy',
+      'Hepatitis',
       'Influenza',
-      'Flulaval',
+      'Flu',
+      'Vaccine',
+      'MMR',
+      'Measles',
+      'Pertussis',
+      'Whooping Cough',
+      'Malaria',
+      'herpes zoster',
+      'Ask2BSure',
+      'Menveo',
       'Fluarix',
-      'FluMist',
-      // Campaign / Spokespeople
-      'Thrive@50+',
-      'Leonard Friedland',
-      'Julie Bowen',
-      'Ty Burrell',
-      'Modern Family',
     ],
     rssFeeds: feeds(
       'bbc',  // BBC
@@ -188,8 +174,8 @@ export const COMPANIES: Company[] = [
   {
     name: 'Trane',
     keywords: [
+      // Per April 28, 2026 authoritative spec
       'Trane',
-      'Trane Technologies',
       'Carrier Global',
       'Johnson Controls',
       'Daikin',
@@ -262,11 +248,11 @@ export const COMPANIES: Company[] = [
   {
     name: 'Amgen',
     keywords: [
+      // Per April 28, 2026 authoritative spec (7 keywords + company name)
       'Amgen',
       'Gout',
       'Thyroid eye',
-      'Sjögren',
-      'Sjogren',
+      "Sjögren's",
       'Tepezza',
       'Krystexxa',
       'pegloticase',
@@ -311,16 +297,10 @@ export const COMPANIES: Company[] = [
   {
     name: 'Otsuka',
     keywords: [
+      // Per April 28, 2026 authoritative spec
       'Otsuka',
       'Rexulti',
       'brexpiprazole',
-      // NEW (June 5 feedback) — Voyxact franchise (kidney disease / IgAN)
-      'Voyxact',
-      'sibeprenlimab',
-      'sibeprenlimab-szsi',
-      'IgA Nephropathy',
-      'IgAN',
-      // Drug-pricing policy
       'drug pricing',
       'drug prices',
       'drug price',
@@ -332,6 +312,7 @@ export const COMPANIES: Company[] = [
       'most-favored-nation',
       'TrumpRx',
       '340B',
+      // Sridevi explicitly requested: psychedelic & psychedelics
       'psychedelic',
       'psychedelics',
     ],
@@ -381,14 +362,9 @@ export const COMPANIES: Company[] = [
   {
     name: 'Indivior',
     keywords: [
-      'Indivior',
-      'Sublocade',
-      'Suboxone',
-      'buprenorphine',
-      'naloxone',
-      'opioid use disorder',
-      'OUD',
-      'addiction treatment',
+      // Per April 28, 2026 authoritative spec (analyst-supplied, exact list).
+      // Product names (Sublocade, Suboxone, buprenorphine, etc.) NOT in spec.
+      // Indivior watches healthcare-provider enforcement actions only.
       'Doctor',
       'Nurse',
       'Pharmacist',
@@ -398,19 +374,16 @@ export const COMPANIES: Company[] = [
       'anesthesiologist',
       'surgeon',
     ],
+    // Indivior uses STRICT ALLOWLIST mode via lib/filters.ts.
+    // Only federal enforcement (DOJ, DEA, HHS-OIG, FDA-OCI) and 51 State AG
+    // sites are accepted. The rssFeeds below are best-effort to seed coverage;
+    // the strict-allowlist filter is the ground truth.
     rssFeeds: feeds(
-      'medcity_news',  // MedCity News
-      'medpage_today',  // MedPage Today
-      'medscape',  // Medscape
-      'medical_xpress',  // Medical Xpress
-      'healthline',  // Healthline
-      'medical_daily',  // Medical Daily
-      'politico',  // POLITICO
-      'npr',  // NPR
-      'the_hill',  // The Hill
-      // === Google News proxies — skipped (we query Google News dynamically) ===
+      // No traditional RSS feeds are accepted for Indivior per spec.
+      // Articles come exclusively via Google News searches scoped to
+      // government enforcement domains, then filtered by strict allowlist.
     ),
-    scrapeTargets: ['statnews.com', 'fiercepharma.com'],
+    scrapeTargets: [],
   },
 ];
 
