@@ -29,32 +29,41 @@ export const COMPANIES: Company[] = [
   {
     name: 'GSK',
     keywords: [
-      // Per April 28, 2026 authoritative spec sheet (exact order, exact spelling)
+      // Per Sujata's authoritative list (33 keywords). This supersedes the
+      // April 28 spec — analyst-supplied via Sujata, June 8, 2026.
       'GSK',
-      'Glaxosmithkline',
+      'GlaxoSmithKline',
+      'Emma Walmsley',
+      'pharmaceutical',
+      'biotech',
       'Pharma',
-      'Drug price',
-      'Shingles',
-      'SHINGRIX',
-      'Meningitis',
-      'Meningococcal',
-      'Bexsero',
+      'vaccine',
       'RSV',
+      'respiratory',
       'respiratory syncytial virus',
       'Arexvy',
-      'Hepatitis',
-      'Influenza',
-      'Flu',
-      'Vaccine',
-      'MMR',
-      'Measles',
-      'Pertussis',
-      'Whooping Cough',
-      'Malaria',
-      'herpes zoster',
-      'Ask2BSure',
+      'Abrysvo',
+      'Clesrovimab',
+      'Nirsevimab',
+      'Beyfortus',
+      'shingles',
+      'Shingrix',
+      'meningitis',
+      'Meningococcal',
+      'Bexsero',
       'Menveo',
+      'Penbraya',
+      'Ask2BSure',
+      'Flu',
+      'Influenza',
+      'Flulaval',
       'Fluarix',
+      'FluMist',
+      'Thrive@50+',
+      'Leonard Friedland',
+      'Julie Bowen',
+      'Ty Burrell',
+      'Modern Family',
     ],
     rssFeeds: feeds(
       'bbc',  // BBC
@@ -174,8 +183,9 @@ export const COMPANIES: Company[] = [
   {
     name: 'Trane',
     keywords: [
-      // Per April 28, 2026 authoritative spec
+      // Per Sujata's authoritative list (7 keywords)
       'Trane',
+      'Trane Technologies',
       'Carrier Global',
       'Johnson Controls',
       'Daikin',
@@ -248,11 +258,12 @@ export const COMPANIES: Company[] = [
   {
     name: 'Amgen',
     keywords: [
-      // Per April 28, 2026 authoritative spec (7 keywords + company name)
+      // Per Sujata's authoritative list (9 keywords — both Sjögren spellings)
       'Amgen',
       'Gout',
       'Thyroid eye',
-      "Sjögren's",
+      'Sjögren',
+      'Sjogren',
       'Tepezza',
       'Krystexxa',
       'pegloticase',
@@ -362,9 +373,19 @@ export const COMPANIES: Company[] = [
   {
     name: 'Indivior',
     keywords: [
-      // Per April 28, 2026 authoritative spec (analyst-supplied, exact list).
-      // Product names (Sublocade, Suboxone, buprenorphine, etc.) NOT in spec.
-      // Indivior watches healthcare-provider enforcement actions only.
+      // Per Sujata's authoritative list (16 keywords).
+      // Strict allowlist mode still enforced via lib/filters.ts — only
+      // federal enforcement (DOJ, DEA, HHS-OIG, FDA-OCI) and 51 State AG
+      // sites pass through. Even matching keywords get dropped if the
+      // domain isn't on the strict allowlist.
+      'Indivior',
+      'Sublocade',
+      'Suboxone',
+      'buprenorphine',
+      'naloxone',
+      'opioid use disorder',
+      'OUD',
+      'addiction treatment',
       'Doctor',
       'Nurse',
       'Pharmacist',
@@ -375,13 +396,10 @@ export const COMPANIES: Company[] = [
       'surgeon',
     ],
     // Indivior uses STRICT ALLOWLIST mode via lib/filters.ts.
-    // Only federal enforcement (DOJ, DEA, HHS-OIG, FDA-OCI) and 51 State AG
-    // sites are accepted. The rssFeeds below are best-effort to seed coverage;
-    // the strict-allowlist filter is the ground truth.
+    // Only DOJ/DEA/HHS-OIG/FDA-OCI/SAMHSA + 51 State AG sites accepted.
     rssFeeds: feeds(
-      // No traditional RSS feeds are accepted for Indivior per spec.
-      // Articles come exclusively via Google News searches scoped to
-      // government enforcement domains, then filtered by strict allowlist.
+      // No traditional RSS feeds — articles come via Google News and
+      // get filtered by strict allowlist.
     ),
     scrapeTargets: [],
   },
