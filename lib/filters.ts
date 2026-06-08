@@ -82,9 +82,32 @@ function getDomain(url: string): string {
   }
 }
 
-function isBlockedDomain(url: string): boolean {
+/**
+ * Per-company override list: domains that are in BLOCKED_DOMAINS but the
+ * company's analyst explicitly approved.
+ *
+ * Discovered 2026-06-06 from Sam's Amgen feedback: MarketBeat & AlphaStreet
+ * articles marked Relevant when they're real PR (MariTide, growth plans, AI),
+ * not stock-rating noise. Stock-noise from these sites still gets caught by
+ * the title-pattern filter (Filter 2) regardless.
+ */
+const COMPANY_DOMAIN_OVERRIDES: Record<string, Set<string>> = {
+  Amgen: new Set([
+    'marketbeat.com',    // Sam approved — "Amgen Touts MariTide, AI Gains and 2026 Growth Plans"
+    'alphastreet.com',   // Sam approved — "Amgen (AMGN) Has a Launch-and-Cash-Flow Story"
+  ]),
+};
+
+function isBlockedDomain(url: string, company: string): boolean {
   const domain = getDomain(url);
   if (!domain) return false;
+  // Check per-company override — if this company explicitly allows this domain, don't block
+  const override = COMPANY_DOMAIN_OVERRIDES[company];
+  if (override) {
+    for (const allowed of override) {
+      if (domain === allowed || domain.endsWith(`.${allowed}`)) return false;
+    }
+  }
   // Check exact and subdomain (e.g. 'in.investing.com' should match 'investing.com')
   for (const blocked of BLOCKED_DOMAINS) {
     if (domain === blocked || domain.endsWith(`.${blocked}`)) return true;
@@ -113,6 +136,13 @@ const STOCK_TITLE_PATTERNS: RegExp[] = [
   // Trading/portfolio activity
   /\b(acquires?|sells?|reduces?|trims?|cuts?|boosts?|buys?|increases?)\s+(its|a|stake|shares|stock|holdings|position)\b.*\$[A-Z]{2,5}\b/i,
   /\b\d[\d,]*\s+shares?\s+(of|in)\b/i,
+  // Additional fund-action patterns from Sam's Amgen feedback (June 5)
+  /\$[A-Z]{2,5}\s+Shares\s+(Acquired|Sold|Purchased|Bought)\s+by\b/i,
+  /\bHas\s+\$[\d,.]+\s+Million\s+(Holdings|Stock\s+Position|Stake)\s+in\b/i,
+  /\bHas\s+\$[\d,.]+\s+(Million|Billion)\s+Position\s+in\b/i,
+  /\bJumps\s+\d+(\.\d+)?%\s+Amid\b/i,
+  /\bDeclines?\s+while\s+market\s+improves\b/i,
+  /\bKey\s+growth\s+drivers,?\s+pipeline\s+advances\b/i,
   // 52-week / momentum / value reporting
   /\b52[-\s]?week\s+(high|low)\b/i,
   /\bmomentum\s+stock\b/i,
@@ -265,7 +295,7 @@ export function applySourceFilters<T extends Article>(
       kept.push(a);
       continue;
     }
-    if (isBlockedDomain(a.link)) {
+    if (isBlockedDomain(a.link, company)) {
       droppedByDomain += 1;
       continue;
     }
