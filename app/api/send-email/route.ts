@@ -1,204 +1,193 @@
 /**
- * Cron endpoint hit by Vercel Cron on schedule.
+ * POST /api/send-email
  *
- * Vercel invokes:   GET /api/cron-send?slot=<slot-id>
+ * Body:
+ *   {
+ *     to: "client@x.com" | comma-separated,
+ *     cc?: string,
+ *     company: "GSK",
+ *     articles: Article[],
+ *     keywords: string[],
+ *     executiveSummary: string,
+ *     slotLabel?: string,   // optional, set by the cron route
+ *     isEmpty?: boolean     // set by cron when no fresh articles
+ *   }
  *
- * Authentication:
- *   - Vercel auto-sends `Authorization: Bearer ${CRON_SECRET}` when the env
- *     var is set in the project. We verify that header.
- *   - With CRON_SECRET unset, the endpoint is open (dev mode). A warning logs.
- *
- * What it does:
- *   1. Look up the slot (which companies to run)
- *   2. For each company, call /api/agent-search internally
- *   3. Defensively re-apply 72h freshness filter
- *   4. Email the result to that company's recipients via /api/send-email
- *   5. Return a JSON summary
+ * Uses SMTP_* env vars + nodemailer to send through AWS SES (or any SMTP host).
  */
 
+import nodemailer from 'nodemailer';
 import { NextRequest, NextResponse } from 'next/server';
-import { getSlot, resolveRecipients, SCHEDULE } from '@/config/schedule';
-import { applyFreshness, getLookbackHours } from '@/lib/freshness';
-import { markSent } from '@/lib/seen';
+import type { Article } from '@/lib/types';
+import { getLookbackHours } from '@/lib/freshness';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+export const maxDuration = 60;
 
-interface AgentSearchResponse {
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function highlightKeywords(text: string, keywords: string[]): string {
+  let out = escapeHtml(text);
+  for (const k of keywords) {
+    if (!k) continue;
+    const re = new RegExp(`\\b(${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'gi');
+    out = out.replace(re, '<mark style="background:#FFF4D6;padding:0 2px;">$1</mark>');
+  }
+  return out;
+}
+
+function buildHtml(opts: {
   company: string;
-  keywordsUsed: string[];
   executiveSummary: string;
-  articles: Array<{
-    title: string; link: string; source: string; sourceType: string;
-    publishedAt?: string | null; snippet?: string;
-    matchedKeywords?: string[]; whyPicked?: string; relevanceScore?: number;
-    undated?: boolean; ageHours?: number | null;
-  }>;
-  stats?: Record<string, unknown>;
-}
-
-function verifyCronAuth(req: NextRequest): { ok: true } | { ok: false; reason: string } {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    console.warn('[cron] CRON_SECRET not set — endpoint is unprotected.');
-    return { ok: true };
-  }
-  const header = req.headers.get('authorization') ?? '';
-  if (header === `Bearer ${secret}`) return { ok: true };
-  const tokenParam = req.nextUrl.searchParams.get('token');
-  if (tokenParam && tokenParam === secret) return { ok: true };
-  return { ok: false, reason: 'unauthorized' };
-}
-
-function baseUrl(req: NextRequest): string {
-  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return req.nextUrl.origin;
-}
-
-async function runAgentForCompany(
-  origin: string,
-  company: string,
-  lookbackHours: number,
-): Promise<AgentSearchResponse> {
-  const res = await fetch(`${origin}/api/agent-search`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ company, lookbackHours, excludeSeen: true }),
-    cache: 'no-store',
+  articles: Article[];
+  keywords: string[];
+  slotLabel?: string;
+  isEmpty?: boolean;
+}): string {
+  const dateStr = new Date().toLocaleString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`agent-search failed for ${company}: ${res.status} ${text}`);
-  }
-  return (await res.json()) as AgentSearchResponse;
+
+  const emptyBanner = opts.isEmpty
+    ? `<div style="padding:16px;background:#FAF7F2;border-left:4px solid #C9A961;
+         margin-bottom:24px;font-family:Georgia,serif;color:#0A2540;">
+         <strong>No significant news in the last ${getLookbackHours()} hours.</strong><br/>
+         This is your scheduled briefing — keeping you in the loop even on quiet days.
+       </div>`
+    : '';
+
+  const articleBlocks = opts.articles
+    .slice(0, 30)
+    .map((a) => {
+      const ageBadge =
+        a.undated ? `<span style="font-size:11px;color:#6B7280;background:#F4EFE6;padding:2px 6px;border-radius:3px;margin-left:6px;">undated</span>`
+        : a.ageHours != null && a.ageHours < 24
+          ? `<span style="font-size:11px;color:#0F7B5F;background:#E7F4EE;padding:2px 6px;border-radius:3px;margin-left:6px;">${Math.round(a.ageHours)}h ago</span>`
+          : '';
+      // Show "via Google News" when the article came from Google News indexing,
+      // not direct RSS. Helps analysts know whether the original publisher RSS
+      // surfaced it or whether Google News found it from a non-listed source.
+      const sourceLabel = a.sourceType === 'google_news'
+        ? `${escapeHtml(a.source)} via Google News`
+        : a.sourceType === 'scrape'
+          ? `${escapeHtml(a.source)} (scraped)`
+          : escapeHtml(a.source);
+      const sourceBadge = `<span style="font-size:11px;color:#0A2540;background:#E5DFD3;padding:2px 6px;border-radius:3px;">${sourceLabel}</span>`;
+      const fullDate = a.publishedAt
+        ? new Date(a.publishedAt).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit',
+          })
+        : '';
+      const bylineParts: string[] = [];
+      if (a.author) bylineParts.push(`by <span style="color:#1A1A1A;">${escapeHtml(a.author)}</span>`);
+      if (fullDate) bylineParts.push(escapeHtml(fullDate));
+      const byline = bylineParts.length
+        ? `<div style="font-family:Georgia,serif;font-size:12px;color:#6B7280;margin-top:4px;">${bylineParts.join(' · ')}</div>`
+        : '';
+      return `
+        <tr><td style="padding:16px 0;border-bottom:1px solid #E5DFD3;">
+          <div style="margin-bottom:6px;">${sourceBadge}${ageBadge}</div>
+          <a href="${escapeHtml(a.link)}" style="font-family:Georgia,serif;font-size:17px;color:#0A2540;font-weight:600;text-decoration:none;">
+            ${highlightKeywords(a.title, opts.keywords)}
+          </a>
+          ${byline}
+          ${a.whyPicked ? `<div style="font-family:Georgia,serif;font-size:14px;color:#1A1A1A;margin-top:8px;line-height:1.5;border-left:2px solid #C9A961;padding-left:10px;font-style:italic;">${escapeHtml(a.whyPicked)}</div>` : ''}
+          ${a.snippet ? `<div style="font-family:Georgia,serif;font-size:13px;color:#6B7280;margin-top:8px;line-height:1.45;">${highlightKeywords(a.snippet.slice(0, 400), opts.keywords)}${a.snippet.length > 400 ? '…' : ''}</div>` : ''}
+        </td></tr>
+      `;
+    }).join('');
+
+  return `<!doctype html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#FAF7F2;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FAF7F2;padding:24px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="640" cellpadding="0" cellspacing="0"
+        style="background:#FFFFFF;border:1px solid #E5DFD3;border-radius:6px;padding:36px;max-width:640px;">
+        <tr><td>
+          <div style="font-family:Georgia,serif;font-size:13px;color:#6B7280;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">
+            PR Monitor · ${escapeHtml(opts.slotLabel ?? '')}
+          </div>
+          <h1 style="font-family:Georgia,serif;font-size:28px;color:#0A2540;margin:0 0 4px 0;">${escapeHtml(opts.company)} — Daily Brief</h1>
+          <div style="font-family:Georgia,serif;font-size:14px;color:#6B7280;margin-bottom:24px;">${dateStr}</div>
+          ${emptyBanner}
+          <div style="font-family:Georgia,serif;font-size:15px;color:#1A1A1A;line-height:1.6;padding:16px;background:#FAF7F2;border-left:3px solid #C9A961;margin-bottom:24px;">
+            ${escapeHtml(opts.executiveSummary)}
+          </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            ${articleBlocks}
+          </table>
+          <div style="font-family:Georgia,serif;font-size:12px;color:#6B7280;margin-top:32px;padding-top:16px;border-top:1px solid #E5DFD3;">
+            Generated by PR Monitor Agent · ${opts.articles.length} article${opts.articles.length === 1 ? '' : 's'} · last ${getLookbackHours()} hours
+          </div>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
 }
 
-async function sendEmail(origin: string, payload: {
-  to: string; cc?: string; company: string;
-  articles: AgentSearchResponse['articles'];
-  keywords: string[]; executiveSummary: string;
-  slotLabel: string; isEmpty: boolean;
-}): Promise<{ ok: boolean; status: number; body?: unknown }> {
-  const res = await fetch(`${origin}/api/send-email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-    cache: 'no-store',
+export async function POST(req: NextRequest) {
+  let body: {
+    to?: string; cc?: string; company?: string;
+    articles?: Article[]; keywords?: string[];
+    executiveSummary?: string; slotLabel?: string; isEmpty?: boolean;
+  };
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  if (!body.to || !body.company || !Array.isArray(body.articles)) {
+    return NextResponse.json({ error: 'to, company, articles required' }, { status: 400 });
+  }
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM ?? user;
+  const port = Number(process.env.SMTP_PORT ?? 587);
+  if (!host || !user || !pass || !from) {
+    return NextResponse.json({ error: 'SMTP_* env vars not configured' }, { status: 500 });
+  }
+
+  const transport = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
   });
-  let body: unknown = null;
-  try { body = await res.json(); } catch { /* ignore */ }
-  return { ok: res.ok, status: res.status, body };
-}
 
-export async function GET(req: NextRequest) {
-  const auth = verifyCronAuth(req);
-  if (auth.ok === false) {
-    return NextResponse.json({ error: auth.reason }, { status: 401 });
-  }
-
-  const slotId = req.nextUrl.searchParams.get('slot');
-  const slot = getSlot(slotId);
-  if (!slot) {
-    return NextResponse.json({
-      error: 'unknown_slot',
-      provided: slotId,
-      validSlots: SCHEDULE.map((s) => s.id),
-    }, { status: 400 });
-  }
-
-  const origin = baseUrl(req);
-  const slotLookback = slot.lookbackHours ?? getLookbackHours();
-  const startedAt = new Date().toISOString();
-  const perCompany: Array<Record<string, unknown>> = [];
-
-  // Sequential — keeps concurrent token use predictable, gives each company
-  // its full share of maxDuration headroom.
-  //
-  // Duplicate-article prevention is handled by per-slot lookbackHours
-  // (see config/schedule.ts): send 1 looks back 72h, sends 2 and 3 look
-  // back ~6h, so the same article rarely appears in two same-day sends.
-  for (const company of slot.companies) {
-    const companyStart = Date.now();
-    try {
-      const agent = await runAgentForCompany(origin, company, slotLookback);
-
-      const filtered = applyFreshness(agent.articles ?? [], slotLookback);
-      const articles = filtered.kept;
-      const isEmpty = articles.length === 0;
-
-      const { to, cc } = resolveRecipients(company);
-      if (to.length === 0) {
-        perCompany.push({
-          company,
-          status: 'skipped_no_recipients',
-          articleCount: articles.length,
-          isEmpty,
-          ms: Date.now() - companyStart,
-        });
-        continue;
-      }
-
-      const emailRes = await sendEmail(origin, {
-        to: to.join(', '),
-        cc: cc.length ? cc.join(', ') : undefined,
-        company,
-        articles,
-        keywords: agent.keywordsUsed ?? [],
-        executiveSummary: isEmpty
-          ? `No significant ${company} news in the last ${slotLookback} hours.`
-          : agent.executiveSummary,
-        slotLabel: slot.label,
-        isEmpty,
-      });
-
-      // Mark URLs as sent ONLY after the email succeeded — a failed email
-      // should NOT mark articles seen, so the next cron retries them.
-      if (emailRes.ok && articles.length > 0) {
-        try {
-          await markSent(company, articles.map((a) => a.link));
-        } catch (err) {
-          // Non-fatal — log and continue. Next run may resend, which is
-          // acceptable degraded behavior.
-          console.warn(`[cron] markSent failed for ${company}:`, err);
-        }
-      }
-
-      const stats = (agent.stats as Record<string, unknown> | undefined) ?? {};
-      perCompany.push({
-        company,
-        status: emailRes.ok ? 'sent' : 'email_failed',
-        articleCount: articles.length,
-        alreadySeenSkipped: stats.alreadySeenSkipped ?? 0,
-        droppedByDomain: stats.droppedByDomain ?? 0,
-        droppedByStockPattern: stats.droppedByStockPattern ?? 0,
-        droppedByNonUS: stats.droppedByNonUS ?? 0,
-        droppedByStrictAllowlist: stats.droppedByStrictAllowlist ?? 0,
-        isEmpty,
-        recipients: { to, cc },
-        emailStatus: emailRes.status,
-        ms: Date.now() - companyStart,
-      });
-    } catch (err) {
-      perCompany.push({
-        company,
-        status: 'error',
-        error: err instanceof Error ? err.message : String(err),
-        ms: Date.now() - companyStart,
-      });
-    }
-  }
-
-  return NextResponse.json({
-    ok: true,
-    slot: slot.id,
-    label: slot.label,
-    startedAt,
-    finishedAt: new Date().toISOString(),
-    lookbackHours: slotLookback,
-    results: perCompany,
+  const html = buildHtml({
+    company: body.company,
+    executiveSummary: body.executiveSummary ?? '',
+    articles: body.articles,
+    keywords: body.keywords ?? [],
+    slotLabel: body.slotLabel,
+    isEmpty: body.isEmpty,
   });
-}
 
-export const POST = GET;
+  try {
+    const info = await transport.sendMail({
+      from,
+      to: body.to,
+      cc: body.cc,
+      subject: `${body.company} — Daily PR Brief · ${new Date().toLocaleDateString('en-US')}`,
+      html,
+    });
+    return NextResponse.json({ ok: true, messageId: info.messageId });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'send failed' },
+      { status: 500 },
+    );
+  }
+}
