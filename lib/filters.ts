@@ -268,6 +268,94 @@ function isNonUS(url: string, company: string): boolean {
   return true;
 }
 
+// --- Filter 4: Strict allowlist mode (per-company) ---------------------------
+//
+// Some companies want a CLOSED universe of approved sources — every other
+// domain dropped, no matter the content. Indivior is the canonical example:
+// the analyst spec lists ONLY federal enforcement agencies (DOJ, DEA,
+// HHS-OIG, FDA-OCI, MFCUs) and State Attorneys General as approved sources.
+// Anything not on this list is automatically dropped.
+//
+// Companies in this map use a STRICT allowlist. Companies NOT in this map
+// rely on the regular block + stock + non-US filters.
+
+const COMPANY_STRICT_ALLOWLIST: Record<string, Set<string>> = {
+  Indivior: new Set([
+    // Federal enforcement (per April 28 spec)
+    'justice.gov',                    // DOJ
+    'usdoj.gov',                      // DOJ alias
+    'deadiversion.usdoj.gov',         // DEA Diversion
+    'dea.gov',                        // DEA
+    'oig.hhs.gov',                    // HHS-OIG
+    'hhs.gov',                        // HHS
+    'fda.gov',                        // FDA (incl OCI)
+    'samhsa.gov',                     // SAMHSA (closely related)
+    // State Attorneys General (all 51 from spec)
+    'alabamaag.gov',
+    'law.alaska.gov',
+    'azag.gov',
+    'arkansasag.gov',
+    'oag.ca.gov',
+    'coag.gov',
+    'portal.ct.gov',
+    'attorneygeneral.delaware.gov',
+    'oag.dc.gov',
+    'myfloridalegal.com',
+    'law.georgia.gov',
+    'ag.hawaii.gov',
+    'ag.idaho.gov',
+    'illinoisattorneygeneral.gov',
+    'in.gov',                         // Indiana AG
+    'iowaattorneygeneral.gov',
+    'ag.ks.gov',
+    'ag.ky.gov',
+    'ag.state.la.us',
+    'maine.gov',
+    'marylandattorneygeneral.gov',
+    'mass.gov',
+    'michigan.gov',
+    'ag.state.mn.us',
+    'ago.state.ms.us',
+    'ago.mo.gov',
+    'dojmt.gov',
+    'ago.nebraska.gov',
+    'ag.nv.gov',
+    'doj.nh.gov',
+    'njoag.gov',
+    'nmag.gov',
+    'ag.ny.gov',
+    'ncdoj.gov',
+    'attorneygeneral.nd.gov',
+    'ohioattorneygeneral.gov',
+    'oag.ok.gov',
+    'doj.state.or.us',
+    'attorneygeneral.gov',            // PA (no subdomain in spec)
+    'riag.ri.gov',
+    'scag.gov',
+    'atg.sd.gov',
+    'tn.gov',                         // TN AG
+    'texasattorneygeneral.gov',
+    'attorneygeneral.utah.gov',
+    'ago.vermont.gov',
+    'oag.state.va.us',
+    'atg.wa.gov',
+    'ago.wv.gov',
+    'doj.state.wi.us',
+    'ag.wyo.gov',
+  ]),
+};
+
+function isStrictAllowlistViolation(url: string, company: string): boolean {
+  const allowlist = COMPANY_STRICT_ALLOWLIST[company];
+  if (!allowlist) return false; // company doesn't use strict mode
+  const domain = getDomain(url);
+  if (!domain) return true; // no domain -> can't verify -> drop
+  for (const allowed of allowlist) {
+    if (domain === allowed || domain.endsWith(`.${allowed}`)) return false;
+  }
+  return true; // domain not in allowlist
+}
+
 // --- Combined filter ---------------------------------------------------------
 
 export interface FilterResult<T> {
@@ -275,11 +363,19 @@ export interface FilterResult<T> {
   droppedByDomain: number;
   droppedByStockPattern: number;
   droppedByNonUS: number;
+  droppedByStrictAllowlist: number;
 }
 
 /**
- * Apply all three filters. Returns the kept subset plus a count breakdown
+ * Apply all four filters. Returns the kept subset plus a count breakdown
  * so the cron route can log what was dropped and why.
+ *
+ * Order matters:
+ *   1. Strict allowlist (Indivior) — if company is in strict mode, drop
+ *      everything not on the allowlist before any other check
+ *   2. Blocked domains (MarketBeat, etc., with per-company overrides)
+ *   3. Stock-title patterns (universal)
+ *   4. Non-US filter (per-company exceptions)
  */
 export function applySourceFilters<T extends Article>(
   articles: T[],
@@ -289,10 +385,22 @@ export function applySourceFilters<T extends Article>(
   let droppedByDomain = 0;
   let droppedByStockPattern = 0;
   let droppedByNonUS = 0;
+  let droppedByStrictAllowlist = 0;
+
+  const isStrict = company in COMPANY_STRICT_ALLOWLIST;
 
   for (const a of articles) {
     if (!a.link) {
+      // Strict-mode companies require a verifiable URL
+      if (isStrict) {
+        droppedByStrictAllowlist += 1;
+        continue;
+      }
       kept.push(a);
+      continue;
+    }
+    if (isStrict && isStrictAllowlistViolation(a.link, company)) {
+      droppedByStrictAllowlist += 1;
       continue;
     }
     if (isBlockedDomain(a.link, company)) {
@@ -310,5 +418,5 @@ export function applySourceFilters<T extends Article>(
     kept.push(a);
   }
 
-  return { kept, droppedByDomain, droppedByStockPattern, droppedByNonUS };
+  return { kept, droppedByDomain, droppedByStockPattern, droppedByNonUS, droppedByStrictAllowlist };
 }
