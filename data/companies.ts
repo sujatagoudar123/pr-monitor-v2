@@ -121,7 +121,7 @@ export const COMPANIES: Company[] = [
       // 'washington_post',  // The Washington Post (PAID)
       // 'the_economist',  // The Economist (PAID)
       // 'the_telegraph',  // The Telegraph (PAID)
-      // 'endpoints_news',  // Endpoints News (PAID)
+      'endpoints_news',  // Endpoints News (RSS headlines free)
       // 'stat_news',  // STAT News (PAID)
       // 'pink_sheet',  // Pink Sheet (PAID)
       // 'scrip',  // Scrip (PAID)
@@ -250,7 +250,7 @@ export const COMPANIES: Company[] = [
       // 'bloomberg',  // Bloomberg (PAID)
       // 'financial_times',  // Financial Times (PAID)
       // 'firstword_pharma',  // FirstWord Pharma (PAID)
-      // 'endpoints_news',  // Endpoints News (PAID)
+      'endpoints_news',  // Endpoints News (RSS headlines free)
       // 'stat_news',  // STAT News (PAID)
       // 'the_economist',  // The Economist (PAID)
       // 'the_pharma_letter',  // The Pharma Letter (PAID)
@@ -302,7 +302,7 @@ export const COMPANIES: Company[] = [
       // 'pink_sheet',  // Pink Sheet (PAID)
       // 'scrip',  // Scrip (PAID)
       // 'seeking_alpha',  // Seeking Alpha (PAID)
-      // 'endpoints_news',  // Endpoints News (PAID)
+      'endpoints_news',  // Endpoints News (RSS headlines free)
       // 'medwatch',  // MedWatch (PAID)
       // === Google News proxies — skipped (we query Google News dynamically) ===
     ),
@@ -314,6 +314,13 @@ export const COMPANIES: Company[] = [
       'Otsuka',
       'Rexulti',
       'brexpiprazole',
+      // NEW (June 5 feedback) — Voyxact franchise (kidney disease / IgAN)
+      'Voyxact',
+      'sibeprenlimab',
+      'sibeprenlimab-szsi',
+      'IgA Nephropathy',
+      'IgAN',
+      // Drug-pricing policy
       'drug pricing',
       'drug prices',
       'drug price',
@@ -357,7 +364,7 @@ export const COMPANIES: Company[] = [
       // === PAID — uncomment after obtaining subscription. See docs/subscriptions.md ===
       // 'bloomberg',  // Bloomberg (PAID)
       // 'bloomberg_law',  // Bloomberg Law (PAID)
-      // 'endpoints_news',  // Endpoints News (PAID)
+      'endpoints_news',  // Endpoints News (RSS headlines free)
       // 'financial_times',  // Financial Times (PAID)
       // 'inside_health_policy',  // Inside Health Policy (PAID)
       // 'medwatch',  // MedWatch (PAID)
