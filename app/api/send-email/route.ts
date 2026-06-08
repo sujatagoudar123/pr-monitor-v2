@@ -72,7 +72,15 @@ function buildHtml(opts: {
         : a.ageHours != null && a.ageHours < 24
           ? `<span style="font-size:11px;color:#0F7B5F;background:#E7F4EE;padding:2px 6px;border-radius:3px;margin-left:6px;">${Math.round(a.ageHours)}h ago</span>`
           : '';
-      const sourceBadge = `<span style="font-size:11px;color:#0A2540;background:#E5DFD3;padding:2px 6px;border-radius:3px;">${escapeHtml(a.source)}</span>`;
+      // Show "via Google News" when the article came from Google News indexing,
+      // not direct RSS. Helps analysts know whether the original publisher RSS
+      // surfaced it or whether Google News found it from a non-listed source.
+      const sourceLabel = a.sourceType === 'google_news'
+        ? `${escapeHtml(a.source)} via Google News`
+        : a.sourceType === 'scrape'
+          ? `${escapeHtml(a.source)} (scraped)`
+          : escapeHtml(a.source);
+      const sourceBadge = `<span style="font-size:11px;color:#0A2540;background:#E5DFD3;padding:2px 6px;border-radius:3px;">${sourceLabel}</span>`;
       const fullDate = a.publishedAt
         ? new Date(a.publishedAt).toLocaleString('en-US', {
             month: 'short', day: 'numeric', year: 'numeric',
