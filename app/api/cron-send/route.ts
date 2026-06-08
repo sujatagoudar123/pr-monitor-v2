@@ -174,6 +174,7 @@ export async function GET(req: NextRequest) {
         droppedByDomain: stats.droppedByDomain ?? 0,
         droppedByStockPattern: stats.droppedByStockPattern ?? 0,
         droppedByNonUS: stats.droppedByNonUS ?? 0,
+        droppedByStrictAllowlist: stats.droppedByStrictAllowlist ?? 0,
         isEmpty,
         recipients: { to, cc },
         emailStatus: emailRes.status,
