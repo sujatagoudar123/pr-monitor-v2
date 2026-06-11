@@ -72,6 +72,37 @@ const BLOCKED_DOMAINS = new Set([
   // PR press-release aggregator sites that re-syndicate without adding value
   'einpresswire.com',
   'prleap.com',
+  // Stock-aggregator caught in BeOne June 8 tracker as "Daily Brief Health Care"
+  'smartkarma.com',
+  // Other stock/PR aggregator sites flagged in trackers
+  'insidermonkey.com',  // Trane June 5 — "Best Electrical Contracting Stocks to Buy"
+  'kalkinemedia.com',   // GSK — "Why is GSK trending right now"
+  'pluang.com',         // GSK — repeated stock-rating coverage
+  'quantum-zeitgeist.com',  // GSK — "How GSK Prepares For Quantum Threats" (off-topic)
+  // Smaller stock/aggregator sites flagged in June 5-9 trackers
+  'wallstreetzen.com',
+  'finimize.com',
+  'minichart.com',
+  'chartmill.com',
+  'stockinvest.us',
+  'stockanalysis.com',
+  'bezkabli.com',
+  'globalbankingandfinance.com',
+  'proactiveinvestors.com',
+  'kalkine.com',
+  'scanx.trade',
+  'whalesbook.com',
+  'devdiscourse.com',
+  'fathomjournal.com',
+  'ssbcrack.com',
+  // Buyer-guide / shopping comparison sites (not editorial)
+  'moneycontrol.com',  // Trane — "Looking for an affordable 1.5-ton AC?"
+  'hariannbasis.co',
+  'harianbasis.co',
+  'briefglance.com',
+  // Consumer-buyer sites for cars (Mazda) — non-US shopping content
+  'autotrader.co.nz',
+  'autonext.co',
 ]);
 
 function getDomain(url: string): string {
@@ -95,6 +126,13 @@ const COMPANY_DOMAIN_OVERRIDES: Record<string, Set<string>> = {
   Amgen: new Set([
     'marketbeat.com',    // Sam approved — "Amgen Touts MariTide, AI Gains and 2026 Growth Plans"
     'alphastreet.com',   // Sam approved — "Amgen (AMGN) Has a Launch-and-Cash-Flow Story"
+  ]),
+  // Mazda: per June 5-9 tracker, analyst marks MSN and AOL Mazda content as
+  // Relevant. Title-pattern filter still catches stock-noise from these
+  // domains (e.g. "Best Electrical Contracting Stocks").
+  Mazda: new Set([
+    'msn.com',
+    'aol.com',
   ]),
 };
 
@@ -174,6 +212,85 @@ const STOCK_TITLE_PATTERNS: RegExp[] = [
   /\bnew\s+52[-\s]?week\s+high\b/i,
   /\bvoting\s+rights\s+(update|announcement)\b/i,
   /\bcooling\s+equipment\s+market\b.*(forecast|companies|opportunities)/i,
+
+  // ---- New patterns from June 8-9 trackers ----
+  
+  // AASTOCKS-style AI pattern recognition headlines
+  /\b《AI》.*Displays?\s+Technical\s+Pattern\b/i,
+  /\bDisplays?\s+Technical\s+Pattern\s+of\b/i,
+  
+  // Valuation/upgrade headlines from stock-aggregator sites
+  /\bValuation\s+Check\s+After\b/i,
+  /\b(Valuation|Stock)\s+Check\s+After\b/i,
+  /\bAI\s+Models?\s+Turn\s+(Cautious|Bullish|Bearish)\b/i,
+  /\bupgraded\s+to\s+strong\s+buy\b/i,
+  /\bUpgraded\s+to\s+(Strong\s+)?(Buy|Sell|Hold|Outperform|Underperform)\b/i,
+  /\bCut\s+to\s+(Hold|Sell|Underperform)\s+(at|by)\b/i,
+  /\bPosition\s+(Raised|Reduced|Boosted|Cut|Trimmed)\s+by\b/i,
+  /\bStock\s+Position\s+(in|by)\b/i,
+  /\bGrants?\s+RSUs?\s+to\s+\d+\s+(employees|directors|executives)/i,
+  /\bDaily\s+Brief\s+Health\s+Care:/i,
+  /\bIs\s+It\s+Too\s+Late\s+To\s+(Consider|Buy)\b/i,
+  
+  // SEC/regulatory filings (insider trades unless about CXO movements)
+  /\b\[Form\s+[3-9]\]\b/i,
+  /\b8-K\s+Filing/i,
+  /\b10-[KQ]\s+Filing/i,
+  /\bSenior\s+Notes,?\s+NYSE\s+Trading/i,
+  
+  // PFAS / contamination settlement (Trane "Not related to HVAC industry")
+  /\b(reaches?|settles?|agrees?\s+to)\s+\$?[\d.]+[MB]?\s+(million|billion)?\s+(PFAS|contamination|chemical)\s+settlement\b/i,
+  /\bPFAS\s+(settlement|contamination|lawsuit|case)\b/i,
+  /\bAgrees?\s+to\s+\$?\d+\s+Million\s+(PFAS|Settlement)/i,
+  
+  // Buyer-guide / consumer shopping headlines (Trane Moneycontrol)
+  /\bLooking\s+for\s+(an?\s+)?affordable\b.*\bunder\s+Rs/i,
+  /\b(\d+|\d+\.\d+)[-\s]?ton\s+AC\b/i,
+  /\bUsed\s+\d{4}\s+\w+/i,  // "Used 2018 White Mazda 3" - car listings
+  /\bFor\s+Sale\s*$/i,       // Car listing titles
+  
+  // Market-report listicles (broader catch beyond cooling equipment)
+  /\b(Market|Industry)\s+(Is\s+Going\s+to\s+Boom|Next\s+Big\s+Thing|Emerging\s+as\b)/i,
+  /\b\|\s*Major\s+(Giants|Players|Companies)\b/i,
+  /\bMarket\s+Size\s+to\s+Reach\s+US?D?\s+/i,
+  /\bMarket\s+\d{4}-\d{4}:\s+/i,
+  /\bMembranous\s+Nephropathy\s+Market\b/i,
+  /\bThyroid\s+Eye\s+Disease\s+Treatment\s+Market\s+Size\b/i,
+  
+  // Conference slideshow (not articles)
+  /\bPresents?\s+at\s+\d+(st|nd|rd|th)?\s+.*\s+Conference\s*-\s*Slideshow\b/i,
+  
+  // Earnings call beat without substantive content (just the headline format)
+  // NOTE: We do NOT filter "Earnings call transcript" by itself — those are substantive
+  
+  // Insider-trade tracking sites
+  /\bInsider\s+Trading\s+Activity\s*$/i,
+  /\bInitial\s+Form\s+\d+/i,
+  
+  // "Movement Within Algorithmic Entry Frameworks" type opaque trading content
+  /\bAlgorithmic\s+(Entry|Trading)\s+(Frameworks?|Setups?)/i,
+  /\bScalable\s+Risk\s*$/i,
+
+  // Quantum-tech off-topic patterns
+  /\bQuantum\s+Threats?\s+to\s+Clinical/i,
+
+  // "Why is X trending right now" speculative headlines
+  /\bWhy\s+is\s+\w+\s+trending\s+right\s+now\b/i,
+
+  // Speculative "Time to (Sell|Buy)" headlines
+  /\bTime\s+to\s+(Sell|Buy)\s+(Pharma|Bank|Tech|Energy|Healthcare)\s+Stocks?\b/i,
+
+  // "Could X be" stock-speculation framing
+  /\bStock\s+(Underperforming|Outperforming)\s+the\s+(Dow|Sector|Industry)/i,
+  /\bIs\s+\w+\s+Stock\s+Underperforming\s+the\s+Dow\b/i,
+
+  // Form filings - share buyback / treasury stock
+  /\bBoosts?\s+Treasury\s+Stock\s+with\s+Latest/i,
+  /\bcontinues?\s+share\s+buyback\b/i,
+
+  // "GF Score" / "GF Value" GuruFocus signature variants
+  /\bGF\s+(Score|Value)\b/i,
+  /\bWhat\s+GF\s+Score\s+of\s+\d+\b/i,
 ];
 
 function isStockNewsTitle(title: string): boolean {
@@ -238,10 +355,21 @@ const COMPANY_UK_ALLOWLIST: Record<string, Set<string>> = {
   Trane: new Set([
     'buildersmerchantsjournal.net',  // Daikin Sustainable Home Centre coverage
     'finansavisen.no',  // JCI Q2 / "Going to Gemba Day" coverage
+    'racmag.co.uk',  // RAC Magazine — Daikin heat pump production site
+    'installeronline.co.uk',  // Installer Online — Daikin heat pumps
+    'theken.com',  // The Ken — "Optimist wants to reinvent the AC"
   ]),
   // Tonoy's BeOne feedback: Pharma Letter explicitly approved
   BeOne: new Set([
     'thepharmaletter.com',  // Brukinsa Ireland reimbursement coverage
+  ]),
+  // Mazda: per the June 5-9 tracker, analyst marks driving.ca, AOL, MSN as
+  // Relevant. Domain override (above) handles MSN/AOL (US sites that were
+  // blocked). Allowlist below handles genuine non-US auto-news sites.
+  Mazda: new Set([
+    'driving.ca',  // Canadian auto comparisons — analyst marks all Y
+    'autotrader.ca',  // Canadian auto listings
+    'autoevolution.com',  // Romanian-based auto news (heavily US/global content)
   ]),
   // All other companies: strict US-only
 };
