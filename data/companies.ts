@@ -78,7 +78,8 @@ export const COMPANIES: Company[] = [
       'the_mirror',  // The Mirror
       'evening_standard',  // Evening Standard
       'this_is_money',  // This is Money
-      'abc_news',  // ABC News
+      'abc_news',  // ABC News (topstories)
+      'abc_news_health',  // ABC News Health (health vertical — Shingles/RSV/vaccines)
       'cbs_news',  // CBS News
       'cbs_health',  // CBS Health
       'nbc_news',  // NBC News
@@ -193,7 +194,8 @@ export const COMPANIES: Company[] = [
       'METUS',
     ],
     rssFeeds: feeds(
-      'abc_news',  // ABC News
+      'abc_news',  // ABC News (topstories)
+      'abc_news_health',  // ABC News Health (health vertical — Shingles/RSV/vaccines)
       'bbc',  // BBC
       'bbc_business',  // BBC Business
       'cbs_news',  // CBS News
@@ -270,7 +272,8 @@ export const COMPANIES: Company[] = [
       'Teprotumumab',
     ],
     rssFeeds: feeds(
-      'abc_news',  // ABC News
+      'abc_news',  // ABC News (topstories)
+      'abc_news_health',  // ABC News Health (health vertical — Shingles/RSV/vaccines)
       'cbs_news',  // CBS News
       'nbc_news',  // NBC News
       'cnn',  // CNN
@@ -328,7 +331,8 @@ export const COMPANIES: Company[] = [
       'psychedelics',
     ],
     rssFeeds: feeds(
-      'abc_news',  // ABC News
+      'abc_news',  // ABC News (topstories)
+      'abc_news_health',  // ABC News Health (health vertical — Shingles/RSV/vaccines)
       'cbs_news',  // CBS News
       'nbc_news',  // NBC News
       'cnn',  // CNN
