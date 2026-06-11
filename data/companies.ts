@@ -29,8 +29,8 @@ export const COMPANIES: Company[] = [
   {
     name: 'GSK',
     keywords: [
-      // Per Sujata's authoritative list (33 keywords). This supersedes the
-      // April 28 spec — analyst-supplied via Sujata, June 8, 2026.
+      // Per Sujata's authoritative list (33 keywords + 1 added June 12).
+      // Supersedes the April 28 spec — analyst-supplied via Sujata.
       'GSK',
       'GlaxoSmithKline',
       'Emma Walmsley',
@@ -48,6 +48,7 @@ export const COMPANIES: Company[] = [
       'Beyfortus',
       'shingles',
       'Shingrix',
+      'recombinant zoster vaccine',
       'meningitis',
       'Meningococcal',
       'Bexsero',
