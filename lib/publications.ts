@@ -30,6 +30,21 @@ export const PUBLICATIONS = {
     rss: 'https://abcnews.go.com/abcnews/topstories',
     status: 'active',
   },
+  // ABC News sub-feeds (the topstories feed misses health-vertical content).
+  // The June 9 Shingles in Young People video segment was a Health vertical
+  // article that didn't surface because we only had topstories.
+  'abc_news_health': {
+    display_name: 'ABC News Health',
+    rss: 'https://abcnews.go.com/abcnews/healthheadlines',
+    status: 'active',
+    notes: 'GSK — health vertical surfaces Shingles/RSV/Meningitis vaccination articles',
+  },
+  'abc_news_us': {
+    display_name: 'ABC News US',
+    rss: 'https://abcnews.go.com/abcnews/usheadlines',
+    status: 'active',
+    notes: 'GSK/Indivior — US national news including health policy and enforcement',
+  },
   'ars_technica': {
     display_name: 'Ars Technica',
     rss: 'https://feeds.arstechnica.com/arstechnica/index',
