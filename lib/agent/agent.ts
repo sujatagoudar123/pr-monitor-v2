@@ -306,7 +306,24 @@ export async function runAgentLoop(
   //   * Batched in groups of 3 for concurrency + Google News rate limits
   // -------------------------------------------------------------------------
   trace.push(`[sweep] starting keyword-coverage sweep across ${company.keywords.length} keywords`);
-  const NEWS_CONTEXT_FOR_CATEGORY = ['outbreak', 'approval', 'FDA', 'CDC', 'recall', 'launch', 'data', 'study'];
+  // For each category keyword, we now run TWO Google News queries:
+  //   1. `keyword outbreak`    — catches clinical/epidemic news
+  //   2. `keyword vaccination` — catches vaccine-rollout / program articles
+  //
+  // Why two: the prior single-rotation sweep missed articles whose context
+  // didn't match the rotated word for that keyword's array position. For
+  // example, "meningitis" was paired only with "outbreak" depending on its
+  // index, so a Guardian article titled "UK School Leavers To Be Offered
+  // Meningitis B Vaccine" never surfaced from `meningitis outbreak`.
+  //
+  // The two fixed pairings together cover the most common health-news
+  // contexts (epidemic events + vaccine rollouts/programs), and keep the
+  // total query count modest enough to stay well within the 300s Vercel
+  // cron limit.
+  //
+  // Cost: roughly 2x category-keyword queries per cron run, e.g. GSK goes
+  // from ~33 to ~42 sweep queries. Safe within rate limits and timeouts.
+  const NEWS_CONTEXT_FIXED = ['outbreak', 'vaccination'];
   const sweepQueries: { term: string; label: string }[] = [];
 
   for (const kw of specificKeywords) {
@@ -315,11 +332,10 @@ export async function runAgentLoop(
     sweepQueries.push({ term: kw, label: `specific:${kw}` });
   }
 
-  for (let i = 0; i < genericKeywords.length; i++) {
-    const kw = genericKeywords[i];
-    // Rotate through news-context words so we don't always pair with "outbreak"
-    const ctx = NEWS_CONTEXT_FOR_CATEGORY[i % NEWS_CONTEXT_FOR_CATEGORY.length];
-    sweepQueries.push({ term: `${kw} ${ctx}`, label: `category:${kw}` });
+  for (const kw of genericKeywords) {
+    for (const ctx of NEWS_CONTEXT_FIXED) {
+      sweepQueries.push({ term: `${kw} ${ctx}`, label: `category:${kw}:${ctx}` });
+    }
   }
 
   const BATCH_SIZE = 3;
