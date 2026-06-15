@@ -138,10 +138,11 @@ export async function runAgentLoop(
 
   const systemMsg =
     `You are a research agent for a PR monitoring tool. Your job: gather articles about "${company.name}" from the LAST 72 HOURS only.\n\n` +
+    `ALL KEYWORDS BELOW ARE EQUALLY IMPORTANT — every keyword should drive at least one search. An article matching "meningitis" is just as valid as one matching "GSK" or "Shingrix", as long as it's news (not a generic explainer).\n\n` +
     `COMPANY-SPECIFIC KEYWORDS (use these as extra_terms — each unambiguously refers to ${company.name}):\n` +
     `${specificKeywords.map((k) => `  - ${k}`).join('\n')}\n\n` +
     (genericKeywords.length
-      ? `CATEGORY/DISEASE TERMS (these alone are too broad, but combining them with a news-context word like "outbreak", "approval", "vaccine drive", "FDA", "CDC", "recall" gives you news in ${company.name}'s market that may not name the company directly — VERY IMPORTANT to find these articles):\n${genericKeywords.map((k) => `  - ${k}`).join('\n')}\n\n`
+      ? `CATEGORY / FRANCHISE KEYWORDS (search these directly too — bare-keyword Google News queries surface news events like "Meningitis Vaccine Rollout", "Shingles Vaccine Effectiveness Study", etc. You may also combine them with words like "outbreak", "vaccination", "approval", "FDA", "CDC" to find more news in ${company.name}'s market — VERY IMPORTANT to cover ALL of these):\n${genericKeywords.map((k) => `  - ${k}`).join('\n')}\n\n`
       : '') +
     `Available sources at runtime:\n` +
     `  - search_rss_feeds        (always — REQUIRED)\n` +
@@ -306,32 +307,35 @@ export async function runAgentLoop(
   //   * Batched in groups of 3 for concurrency + Google News rate limits
   // -------------------------------------------------------------------------
   trace.push(`[sweep] starting keyword-coverage sweep across ${company.keywords.length} keywords`);
-  // For each category keyword, we now run TWO Google News queries:
-  //   1. `keyword outbreak`    — catches clinical/epidemic news
-  //   2. `keyword vaccination` — catches vaccine-rollout / program articles
+  // Per analyst direction (June 2026): "give all keywords equal importance."
   //
-  // Why two: the prior single-rotation sweep missed articles whose context
-  // didn't match the rotated word for that keyword's array position. For
-  // example, "meningitis" was paired only with "outbreak" depending on its
-  // index, so a Guardian article titled "UK School Leavers To Be Offered
-  // Meningitis B Vaccine" never surfaced from `meningitis outbreak`.
+  // Every keyword — whether company-specific (Shingrix, Bexsero) or category
+  // (meningitis, shingles, vaccine) — now gets a DIRECT Google News query.
+  // For category keywords we additionally run two paired-context queries
+  // (outbreak, vaccination) to surface news-event articles where Google
+  // News might bury the bare-keyword query under generic explainers.
   //
-  // The two fixed pairings together cover the most common health-news
-  // contexts (epidemic events + vaccine rollouts/programs), and keep the
-  // total query count modest enough to stay well within the 300s Vercel
-  // cron limit.
+  // Why: an article titled "Dad Praises 'Fantastic' Meningitis Vaccine
+  // Rollout" matches the keyword `meningitis` but had been treated as a
+  // lower-priority "category" hit. The direct `meningitis` query in
+  // Google News surfaces this and similar news-event articles. Pure
+  // wellness/explainer content is still filtered out by the ranker's
+  // news-context check downstream.
   //
-  // Cost: roughly 2x category-keyword queries per cron run, e.g. GSK goes
-  // from ~33 to ~42 sweep queries. Safe within rate limits and timeouts.
+  // Cost: roughly +9 queries per company with category keywords.
+  // GSK goes from 42 → 51 sweep queries. Safe within cron limits.
   const NEWS_CONTEXT_FIXED = ['outbreak', 'vaccination'];
   const sweepQueries: { term: string; label: string }[] = [];
 
-  for (const kw of specificKeywords) {
-    // Don't re-search company name (already in iter 0)
+  // Direct query for EVERY keyword — equal treatment per analyst direction.
+  // Skip the company name itself (already covered by iter 0).
+  for (const kw of company.keywords) {
     if (kw.toLowerCase() === company.name.toLowerCase()) continue;
-    sweepQueries.push({ term: kw, label: `specific:${kw}` });
+    sweepQueries.push({ term: kw, label: `direct:${kw}` });
   }
 
+  // Additionally, category keywords get paired-context queries to catch
+  // news events that bare-keyword Google News results might bury.
   for (const kw of genericKeywords) {
     for (const ctx of NEWS_CONTEXT_FIXED) {
       sweepQueries.push({ term: `${kw} ${ctx}`, label: `category:${kw}:${ctx}` });
