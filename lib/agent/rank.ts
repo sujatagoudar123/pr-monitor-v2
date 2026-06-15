@@ -100,18 +100,22 @@ function regexFallback(article: Article, keywords: string[], companyName: string
     };
   }
 
-  // Generic-only — distinguish news event from generic explainer
+  // Per analyst direction (June 2026): "all keywords equal importance,
+  // meningitis doesn't need GSK [in the same article]." A keyword-only
+  // match that ALSO has news context is a real event article and gets
+  // the same 0.6 floor as a named-mention match.
   if (hasNewsContext(article)) {
     return {
-      relevance: 0.5,
+      relevance: 0.6,
       matched,
-      why: `News in ${companyName}'s category (${matched.slice(0, 2).join(', ')}) — outbreak, approval, or market event.`,
+      why: `News matching ${companyName} keyword(s) ${matched.slice(0, 2).join(', ')} — event, rollout, or announcement.`,
     };
   }
+  // Pure educational/wellness content — no event signal. Drop these.
   return {
     relevance: 0.3,
     matched,
-    why: `Only matched generic terms (${matched.slice(0, 3).join(', ')}) in a non-news context.`,
+    why: `Keyword(s) ${matched.slice(0, 3).join(', ')} appear, but no news-event context — likely an explainer.`,
   };
 }
 
@@ -143,32 +147,37 @@ async function rankBatch(
 
   const prompt = `You are evaluating news articles for relevance to a PR monitoring brief about "${company}".
 
+ALL KEYWORDS BELOW ARE EQUALLY IMPORTANT — any article matching any keyword should be considered for inclusion. An article matching "meningitis" or "shingles" is just as valid as one matching "GSK" or "Shingrix", as long as it's news (not a generic explainer).
+
 COMPANY-SPECIFIC KEYWORDS (each one unambiguously refers to the company, its products, brands, or key people):
 ${specificKeywords.map((k) => `  - ${k}`).join('\n')}
 
-GENERIC INDUSTRY TERMS (these alone are NOT enough — articles must also mention the company or a specific keyword to score high):
+CATEGORY / FRANCHISE KEYWORDS (treat these with equal weight — they cover the company's market and any news event under these terms is relevant):
 ${genericKeywords.map((k) => `  - ${k}`).join('\n') || '  (none)'}
 
-SCORING RULES (follow these strictly):
+SCORING RULES:
 - 1.0 = directly about ${company}'s business, products, leadership, regulatory actions, or material news. Company name or a company-specific keyword appears prominently in the title or first sentence.
 - 0.7–0.9 = clearly about ${company} or one of its products/brands/people, even if other topics are also discussed.
-- 0.5–0.6 = (a) mentions ${company} or a company-specific keyword somewhere in the article, but the article is primarily about something else, OR (b) the article is real news directly about a disease/franchise/category from the GENERIC list (e.g. a meningitis outbreak, a vaccination drive, an RSV regulatory action) — i.e. it's news that materially affects ${company}'s market even if the company isn't named.
-- 0.3 = the GENERIC term appears but only in a general explainer / wellness / "what is X" / "how to prevent" context — no real news event, no policy action, no outbreak. DROP THESE.
+- 0.5–0.6 = news event about any keyword category — outbreaks, vaccine rollouts, FDA actions, regulatory updates, public-health programs, market dynamics — even if ${company} isn't named. EXAMPLE: "Dad Praises Meningitis Vaccine Rollout" matches "meningitis" + "vaccine" + has news context ("rollout") → keep at 0.5.
+- 0.3 = the keyword appears but only in a general explainer / wellness / "what is X" / "how to prevent" context — no real news event, no policy action, no outbreak. DROP THESE.
 - 0.0 = unrelated.
 
-KEY DISTINCTION for borderline cases (no company-specific keyword present):
+KEY DISTINCTION (news event vs explainer):
   KEEP (score 0.5–0.6):
     - "Meningitis outbreak at university, vaccines offered to students"
+    - "Dad Praises 'Fantastic' Meningitis Vaccine Rollout"
     - "FDA approves first RSV vaccine for infants"
     - "CDC reports surge in shingles cases among adults"
-    - "Drug pricing legislation passes Senate" (for companies with policy keywords)
+    - "Young People Urged To Get Meningitis B Vaccine"
+    - "Drug pricing legislation passes Senate"
   DROP (score 0.3):
     - "What is meningitis? Symptoms and treatment"
     - "How to protect yourself from contagious viruses"
     - "10 things to know about getting older with shingles"
     - "Wellness tips for cold and flu season"
 
-The signal for KEEP is an event, action, or development. The signal for DROP is a general educational/wellness/listicle piece.
+The signal for KEEP is an event, action, announcement, or policy development.
+The signal for DROP is a general educational/wellness/listicle piece with no specific event.
 
 For each article, list which keywords/topics actually appear, and write ONE short sentence explaining the score.
 
