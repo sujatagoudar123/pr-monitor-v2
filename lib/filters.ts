@@ -103,6 +103,9 @@ const BLOCKED_DOMAINS = new Set([
   // Consumer-buyer sites for cars (Mazda) — non-US shopping content
   'autotrader.co.nz',
   'autonext.co',
+  // June 15-16 tracker: Kenyan/Asian aggregators marked Non-US by analysts
+  'streamlinefeed.co.ke',  // Aparna (Trane) + Sanika (GSK) — Non US
+  'tradekaizen.com',  // Aparna (Trane) — Non US
 ]);
 
 function getDomain(url: string): string {
@@ -178,6 +181,8 @@ const STOCK_TITLE_PATTERNS: RegExp[] = [
   /\$[A-Z]{2,5}\s+Shares\s+(Acquired|Sold|Purchased|Bought)\s+by\b/i,
   /\bHas\s+\$[\d,.]+\s+Million\s+(Holdings|Stock\s+Position|Stake)\s+in\b/i,
   /\bHas\s+\$[\d,.]+\s+(Million|Billion)\s+Position\s+in\b/i,
+  // June tracker (Sam): "Hilton Head Capital Partners LLC Purchases Shares of 3,798 Amgen Inc."
+  /\bPurchases\s+Shares\s+of\s+(?:[\d,]+\s+)?[A-Z]/i,
   /\bJumps\s+\d+(\.\d+)?%\s+Amid\b/i,
   /\bDeclines?\s+while\s+market\s+improves\b/i,
   /\bKey\s+growth\s+drivers,?\s+pipeline\s+advances\b/i,
