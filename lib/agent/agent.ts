@@ -307,39 +307,29 @@ export async function runAgentLoop(
   //   * Batched in groups of 3 for concurrency + Google News rate limits
   // -------------------------------------------------------------------------
   trace.push(`[sweep] starting keyword-coverage sweep across ${company.keywords.length} keywords`);
-  // Per analyst direction (June 2026): "give all keywords equal importance."
+  // EQUAL-PREFERENCE SWEEP (per analyst direction, June 2026):
+  // Every keyword — whether company-specific (Shingrix, Bexsero, Modern Family)
+  // or category (meningitis, shingles, vaccine, Flu) — gets EXACTLY ONE direct
+  // Google News query. No special treatment, no paired queries, no rotation.
   //
-  // Every keyword — whether company-specific (Shingrix, Bexsero) or category
-  // (meningitis, shingles, vaccine) — now gets a DIRECT Google News query.
-  // For category keywords we additionally run two paired-context queries
-  // (outbreak, vaccination) to surface news-event articles where Google
-  // News might bury the bare-keyword query under generic explainers.
+  // Why this is safe:
+  //   - Fewer queries than the previous version (GSK 42 → 33, Otsuka 27 → 15,
+  //     Indivior 26 → 15). Total drops from 132 to 94 per cron cycle.
+  //   - Cron stays well within the 300s Vercel maxDuration.
+  //   - Google News already ranks bare-keyword searches by recency and
+  //     relevance, so direct `meningitis` surfaces real meningitis news
+  //     (vaccine rollouts, outbreaks, alerts) without needing paired terms.
+  //   - The ranker's news-context check still drops pure explainers
+  //     ("What is meningitis?" wellness pieces score 0.3 → below threshold).
   //
-  // Why: an article titled "Dad Praises 'Fantastic' Meningitis Vaccine
-  // Rollout" matches the keyword `meningitis` but had been treated as a
-  // lower-priority "category" hit. The direct `meningitis` query in
-  // Google News surfaces this and similar news-event articles. Pure
-  // wellness/explainer content is still filtered out by the ranker's
-  // news-context check downstream.
-  //
-  // Cost: roughly +9 queries per company with category keywords.
-  // GSK goes from 42 → 51 sweep queries. Safe within cron limits.
-  const NEWS_CONTEXT_FIXED = ['outbreak', 'vaccination'];
+  // History (do NOT regress without re-budgeting):
+  //   - June 17: tried "direct for every keyword PLUS 2 paired for category"
+  //     (GSK 51 queries). Pushed cron past 300s → 504 timeouts → no emails.
+  //   - This version: just direct queries, no extras.
   const sweepQueries: { term: string; label: string }[] = [];
-
-  // Direct query for EVERY keyword — equal treatment per analyst direction.
-  // Skip the company name itself (already covered by iter 0).
   for (const kw of company.keywords) {
     if (kw.toLowerCase() === company.name.toLowerCase()) continue;
     sweepQueries.push({ term: kw, label: `direct:${kw}` });
-  }
-
-  // Additionally, category keywords get paired-context queries to catch
-  // news events that bare-keyword Google News results might bury.
-  for (const kw of genericKeywords) {
-    for (const ctx of NEWS_CONTEXT_FIXED) {
-      sweepQueries.push({ term: `${kw} ${ctx}`, label: `category:${kw}:${ctx}` });
-    }
   }
 
   const BATCH_SIZE = 3;
